@@ -1,0 +1,50 @@
+# Server-side CI gate. Mirrors the local gitleaks pre-commit hook so a contributor
+# who skipped `pre-commit install` is still caught. DevOps owns CI and extends this
+# file with the per-feature test/build/deploy jobs (stubs noted at the bottom).
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # full history so the scan covers the whole branch
+
+      # Primary: official action (auto-uses .gitleaks.toml at the repo root).
+      # NOTE: gitleaks-action is free for individuals/public repos, but for a
+      # GitHub ORGANIZATION (e.g. Fictiv) it requires a free GITLEAKS_LICENSE key.
+      # Add it as a repo/org secret and uncomment the line below.
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}   # required for org accounts
+
+      # License-free alternative — delete the step above and use this instead.
+      # Pins the same version as .pre-commit-config.yaml so local and CI match.
+      # - name: gitleaks (CLI, no license)
+      #   run: |
+      #     VER=8.24.2
+      #     curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${VER}/gitleaks_${VER}_linux_x64.tar.gz" \
+      #       | tar -xz gitleaks
+      #     ./gitleaks git --config .gitleaks.toml --redact -v
+
+  # ── DevOps extends CI here, per the real stack ──
+  # test:
+  #   needs: secret-scan
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - run: npm ci && npm test            # ux / application / api
+  #     # - run: pytest                      # python Lambdas
+  #     # - run: cfn-lint infrastructure/**  # CloudFormation

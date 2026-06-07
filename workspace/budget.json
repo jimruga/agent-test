@@ -1,0 +1,13 @@
+{
+  "feature": "<feature name>",
+  "allocated_tokens": 0,
+  "used_tokens": 0,
+  "hard_cap_tokens": 0,
+  "thresholds_alerted": [],
+  "aws_estimate_monthly_usd": {
+    "staging": 0,
+    "production": 0,
+    "approved_total": 0
+  },
+  "notes": "PM sets allocated_tokens + hard_cap_tokens from the PRD at Gate 1. The hook updates used_tokens and thresholds_alerted automatically. hard_cap_tokens is the point at which new subagent dispatch is blocked until a human raises it."
+}

@@ -1,0 +1,18 @@
+# Gitleaks config. Builds on the maintained default rule set and adds an
+# allowlist for documentation placeholders in this repo (the example PRDs and
+# README contain illustrative, non-secret values like a sample Slack webhook URL).
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allow documentation/example placeholders"
+paths = [
+  '''examples/.*''',
+  '''README\.md''',
+  '''\.gitleaks\.toml''',
+  '''workspace/budget\.json''',
+]
+# If a real placeholder string ever trips a rule, add it here as a regex:
+regexes = [
+  '''hooks\.slack\.com/services/\.\.\.''',
+]

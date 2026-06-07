@@ -1,0 +1,56 @@
+# ─── Secrets & keys (backstop — these must live in the AWS key store, never here) ───
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+id_rsa*
+*.crt           # exclude certs from VCS; reference from Secrets Manager / ACM
+secrets.*
+credentials
+credentials.*
+.aws/
+aws.json
+**/serviceAccount*.json
+*.tfvars        # often hold secrets if Terraform is ever used
+
+# ─── Claude Code local overrides (keep settings.json shared; ignore personal) ───
+.claude/settings.local.json
+.claude/*.local.json
+
+# ─── Node / React (ux, frontend) ───
+node_modules/
+dist/
+build/
+coverage/
+.next/
+*.log
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.cache/
+.eslintcache
+
+# ─── Python (any tooling / Lambdas) ───
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# ─── Build / package artifacts (Lambda zips, CFN packaged output) ───
+*.zip
+.aws-sam/
+packaged.yaml
+cdk.out/
+
+# ─── OS / editor noise ───
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
