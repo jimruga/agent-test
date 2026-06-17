@@ -1,87 +1,75 @@
 #!/usr/bin/env bash
-# Budget-threshold hook for the agent team.
-#
-# Two modes (the same script, different arg):
-#   update  -> wired to SubagentStop + Stop. Recomputes total token usage from
-#              the session transcripts, writes it to workspace/budget.json, and
-#              posts a Slack alert when a 25/50/75/90% threshold is first crossed.
-#   check   -> wired to PreToolUse(matcher: Agent). Blocks spawning a new subagent
-#              (exit 2) once usage reaches the hard cap, so work pauses until a
-#              human raises `allocated_tokens` / `hard_cap_tokens`.
-#
-# Requires: jq, and (optional) curl + SLACK_BUDGET_WEBHOOK env var for Slack.
-# Notes: token fields in Claude Code transcripts can vary by version — verify with
-# `claude --debug` and adjust the jq usage paths below if your totals look off.
-
-set -euo pipefail
+# Budget-threshold hook. Two modes (same script):
+#   update -> SubagentStop/Stop: recompute total token usage from the session
+#             transcripts, write to budget.json, Slack-alert on first crossing of
+#             25/50/75/90%.
+#   check  -> PreToolUse(Agent): block (exit 2) once usage reaches the hard cap.
+# Uses python3 (no jq). Slack alerts sent only if SLACK_BUDGET_WEBHOOK is set.
+# Fails open if python3 or the budget file is missing.
+set -uo pipefail
 MODE="${1:-update}"
 BUDGET_FILE="${BUDGET_FILE:-./workspace/budget.json}"
-INPUT="$(cat || true)"
-
-# Fail open: never break the session if tooling/config is missing.
-command -v jq >/dev/null 2>&1 || { echo "budget hook: jq not found, skipping" >&2; exit 0; }
+command -v python3 >/dev/null 2>&1 || { echo "budget hook: python3 not found, skipping" >&2; exit 0; }
 [ -f "$BUDGET_FILE" ] || { echo "budget hook: $BUDGET_FILE not found, skipping" >&2; exit 0; }
+INPUT="$(cat 2>/dev/null || true)"
 
-alert() { # $1 = message
-  echo "BUDGET: $1"
-  if [ -n "${SLACK_BUDGET_WEBHOOK:-}" ] && command -v curl >/dev/null 2>&1; then
-    curl -fsS -X POST -H 'Content-type: application/json' \
-      --data "$(jq -nc --arg t ":moneybag: $1" '{text:$t}')" \
-      "$SLACK_BUDGET_WEBHOOK" >/dev/null 2>&1 || true
-  fi
-}
+BUDGET_FILE="$BUDGET_FILE" MODE="$MODE" SLACK_BUDGET_WEBHOOK="${SLACK_BUDGET_WEBHOOK:-}" \
+python3 - "$INPUT" << 'PY'
+import json, os, sys, glob, urllib.request
+bf = os.environ["BUDGET_FILE"]; mode = os.environ["MODE"]
+inp = sys.argv[1] if len(sys.argv) > 1 else ""
+b = json.load(open(bf))
 
-if [ "$MODE" = "check" ]; then
-  used=$(jq -r '.used_tokens // 0' "$BUDGET_FILE")
-  cap=$(jq -r '.hard_cap_tokens // 0' "$BUDGET_FILE")
-  if [ "$cap" -gt 0 ] && [ "$used" -ge "$cap" ]; then
-    echo "Token build budget exhausted (${used}/${cap}). A human must approve more tokens: raise allocated_tokens / hard_cap_tokens in ${BUDGET_FILE}." >&2
-    exit 2   # blocks the Agent spawn
-  fi
-  exit 0
-fi
+def alert(msg):
+    print("BUDGET:", msg)
+    hook = os.environ.get("SLACK_BUDGET_WEBHOOK")
+    if hook:
+        try:
+            urllib.request.urlopen(urllib.request.Request(hook,
+                data=json.dumps({"text": ":moneybag: " + msg}).encode(),
+                headers={"content-type": "application/json"}), timeout=5)
+        except Exception: pass
 
-# ---- update mode ----
-tp=$(printf '%s' "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null || true)
-[ -n "$tp" ] && [ -f "$tp" ] || { echo "budget hook: no transcript_path, skipping" >&2; exit 0; }
+if mode == "check":
+    used = b.get("used_tokens", 0); cap = b.get("hard_cap_tokens", 0)
+    if cap and used >= cap:
+        sys.stderr.write(f"Token build budget exhausted ({used}/{cap}). A human must approve "
+                         f"more tokens: raise allocated_tokens / hard_cap_tokens in {bf}.\n")
+        sys.exit(2)
+    sys.exit(0)
 
-sum_file() { # sum token usage in one JSONL transcript
-  jq -s '[.[] | (.message.usage // empty)
-          | ((.input_tokens//0)+(.output_tokens//0)
-             +(.cache_read_input_tokens//0)+(.cache_creation_input_tokens//0))]
-         | add // 0' "$1" 2>/dev/null || echo 0
-}
+# update mode
+try: ev = json.loads(inp) if inp.strip() else {}
+except Exception: ev = {}
+tp = ev.get("transcript_path", "")
+if not tp or not os.path.exists(tp):
+    sys.stderr.write("budget hook: no transcript_path, skipping\n"); sys.exit(0)
 
-total=$(sum_file "$tp")
-session_dir=$(dirname "$tp")
-if [ -d "$session_dir/subagents" ]; then
-  for f in "$session_dir"/subagents/agent-*.jsonl; do
-    [ -e "$f" ] || continue
-    total=$(( total + $(sum_file "$f") ))
-  done
-fi
+def toks(path):
+    t = 0
+    try:
+        for line in open(path):
+            try: u = (json.loads(line).get("message") or {}).get("usage") or {}
+            except Exception: continue
+            t += sum(u.get(k, 0) for k in ("input_tokens","output_tokens",
+                     "cache_read_input_tokens","cache_creation_input_tokens"))
+    except FileNotFoundError: pass
+    return t
 
-allocated=$(jq -r '.allocated_tokens // 0' "$BUDGET_FILE")
-prev=$(jq -r '(.thresholds_alerted // [])' "$BUDGET_FILE")
-
-# write the new total
-tmp=$(mktemp)
-jq --argjson used "$total" '.used_tokens = $used' "$BUDGET_FILE" > "$tmp" && mv "$tmp" "$BUDGET_FILE"
-
-[ "$allocated" -gt 0 ] || exit 0
-pct=$(( total * 100 / allocated ))
-
-for th in 25 50 75 90; do
-  already=$(printf '%s' "$prev" | jq --argjson t "$th" 'index($t) != null')
-  if [ "$pct" -ge "$th" ] && [ "$already" = "false" ]; then
-    alert "build budget at ${pct}% (${total}/${allocated} tokens) — crossed ${th}% on feature $(jq -r '.feature // "?"' "$BUDGET_FILE")"
-    tmp=$(mktemp)
-    jq --argjson t "$th" '.thresholds_alerted = ((.thresholds_alerted // []) + [$t] | unique)' "$BUDGET_FILE" > "$tmp" && mv "$tmp" "$BUDGET_FILE"
-    prev=$(jq -r '(.thresholds_alerted // [])' "$BUDGET_FILE")
-  fi
-done
-
-if [ "$pct" -ge 100 ]; then
-  alert "build budget EXCEEDED at ${pct}% — new subagent dispatch will be blocked until a human raises the allocation."
-fi
-exit 0
+total = toks(tp)
+for f in glob.glob(os.path.join(os.path.dirname(tp), "subagents", "agent-*.jsonl")):
+    total += toks(f)
+b["used_tokens"] = total
+alloc = b.get("allocated_tokens", 0)
+done = set(b.get("thresholds_alerted", []))
+if alloc:
+    pct = total * 100 // alloc
+    for th in (25, 50, 75, 90):
+        if pct >= th and th not in done:
+            alert(f"build budget at {pct}% ({total}/{alloc} tokens) — crossed {th}% on {b.get('feature','?')}")
+            done.add(th)
+    if pct >= 100:
+        alert(f"build budget EXCEEDED at {pct}% — new subagent dispatch will be blocked until a human raises it.")
+    b["thresholds_alerted"] = sorted(done)
+json.dump(b, open(bf, "w"), indent=2)
+PY

@@ -1,0 +1,11 @@
+# Independent review on sensitive paths (segregation of duties). Replace the
+# placeholder teams with real human GitHub teams. Pair with a repository ruleset
+# that requires CODEOWNER review on these paths.
+# Owners must be HUMAN teams — agents do not hold approval authority.
+
+*                       @your-org/eng-reviewers
+/migrations/            @your-org/data-owners @your-org/dba
+/infrastructure/        @your-org/devops @your-org/security
+/compliance/            @your-org/compliance @your-org/security
+/.github/               @your-org/devops
+/verify.sh              @your-org/eng-leads

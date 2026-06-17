@@ -1,0 +1,12 @@
+{
+  "_comment": "Portfolio backlog. Jira holds the tickets; this is the PM's scheduling view: priority order + WIP limit so the team runs a portfolio, not one feature at a time. wip_limit caps features in active build concurrently.",
+  "wip_limit": 2,
+  "active": [
+    { "feature": "Saved Search Alerts", "jira": "DAT-900", "phase": "observe", "risk_tier": "standard" }
+  ],
+  "queued": [
+    { "feature": "Inbound Webhook Processor", "jira": "DAT-950", "priority": 1, "risk_tier": "standard" },
+    { "feature": "Export to S3", "jira": "DAT-970", "priority": 2, "risk_tier": "low" }
+  ],
+  "blocked": []
+}

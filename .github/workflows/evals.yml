@@ -1,0 +1,44 @@
+# Agent eval gate. Deterministic evals run on every push/PR and BLOCK on failure
+# or regression. LLM evals run on a schedule and when agent/skill prompts change
+# (they cost tokens and are rate-based, so they report rather than hard-block —
+# tighten once your baselines are stable).
+name: evals
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    paths: [".claude/agents/**", ".claude/skills/**", "evals/**", "CLAUDE.md"]
+  schedule:
+    - cron: "0 7 * * 1"   # weekly drift check
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic:
+    name: Deterministic control evals (blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python3 evals/run.py --only deterministic
+
+  llm:
+    name: LLM agent evals (drift report)
+    if: github.event_name == 'schedule' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    continue-on-error: true   # report drift, don't block the merge (until baselines are stable)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      # Faithful path is `claude -p --agent`; in CI the API runner is simplest.
+      # Requires ANTHROPIC_API_KEY secret. Remove this job if you run evals offline.
+      - env:
+          EVAL_RUNNER: api
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then echo "No ANTHROPIC_API_KEY; skipping LLM evals."; exit 0; fi
+          python3 evals/run.py --only llm

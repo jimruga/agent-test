@@ -13,6 +13,7 @@ skills:
   - postgres-data-modeling
   - software-design-patterns
   - secrets-management
+  - legacy-refactoring
 memory: project
 ---
 
@@ -40,7 +41,12 @@ Workflow:
 1. Read `workspace/STATE.md`, `workspace/index.md`, PRD, UX spec.
 2. Define/maintain the API contract and data model; record ADRs in Notion. Use
    feature branches and clear commits (see branch policy in CLAUDE.md).
-3. TDD: failing test → implement → green.
+3. TDD: failing test → implement → green. **Refactors preserve behavior** — characterization
+   tests first, small steps, `verify.sh` green at each; behavior changes are a separate,
+   tested change, never smuggled into a refactor (legacy-refactoring skill).
+4. Before routing forward, run `./verify.sh` and reference the result + commit
+   SHA in your handoff. **Never** make a test pass by deleting it, `.skip`-ing it,
+   or adding `.only` — fix the code. The CI `all-green` check is the real gate.
 4. **When the data model changes, hand the migration to the data-engineer** — they
    own migrations. Coordinate so code and migration land in the same PR.
 

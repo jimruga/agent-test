@@ -2,7 +2,7 @@
 name: spend
 description: Cost-monitoring specialist (read-only). Use periodically and at any budget question to track token build-spend against the PRD allocation and actual AWS spend (staging + production) against the estimate, report at thresholds, forecast overruns, and route overage to the right owner. Monitors and reports — never makes spend decisions or changes code/infra.
 model: sonnet
-disallowedTools: Write, Edit
+disallowedTools: Write, Edit, Bash
 mcpServers:
   - aws
   - slack

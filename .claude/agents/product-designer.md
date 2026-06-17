@@ -2,6 +2,7 @@
 name: product-designer
 description: Product/UX designer. Use after the PRD is approved (Gate 1) to produce the user-experience design and UI mocks. Optimizes for the target user's experience, visual appeal, and intuitive organization. Owns UX; does not write production code.
 model: sonnet
+disallowedTools: Bash
 mcpServers:
   - notion
   - slack

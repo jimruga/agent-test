@@ -1,6 +1,7 @@
-# Server-side CI gate. Mirrors the local gitleaks pre-commit hook so a contributor
-# who skipped `pre-commit install` is still caught. DevOps owns CI and extends this
-# file with the per-feature test/build/deploy jobs (stubs noted at the bottom).
+# Server-side verification gate. These checks run where agents have no write
+# access; branch protection (scripts/setup-branch-protection.sh) makes them
+# binding, so a red or unreviewed PR cannot be merged no matter what an agent
+# claims. The `all-green` job is the single required status check.
 name: ci
 
 on:
@@ -10,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   secret-scan:
@@ -17,34 +19,91 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0          # full history so the scan covers the whole branch
-
-      # Primary: official action (auto-uses .gitleaks.toml at the repo root).
-      # NOTE: gitleaks-action is free for individuals/public repos, but for a
-      # GitHub ORGANIZATION (e.g. Fictiv) it requires a free GITLEAKS_LICENSE key.
-      # Add it as a repo/org secret and uncomment the line below.
-      - name: gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}   # required for org accounts
 
-      # License-free alternative — delete the step above and use this instead.
-      # Pins the same version as .pre-commit-config.yaml so local and CI match.
-      # - name: gitleaks (CLI, no license)
-      #   run: |
-      #     VER=8.24.2
-      #     curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${VER}/gitleaks_${VER}_linux_x64.tar.gz" \
-      #       | tar -xz gitleaks
-      #     ./gitleaks git --config .gitleaks.toml --redact -v
+  verify:
+    name: Verify (lint · typecheck · test · coverage · anti-tamper)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }          # full history so the tamper diff has a base
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Resolve diff base
+        run: echo "VERIFY_BASE=origin/${{ github.base_ref || github.event.repository.default_branch || 'main' }}" >> "$GITHUB_ENV"
+      - name: Run verification (single source of truth)
+        env:
+          VERIFY_MODE: full
+          MIN_COVERAGE: "80"
+        run: ./verify.sh
 
-  # ── DevOps extends CI here, per the real stack ──
-  # test:
-  #   needs: secret-scan
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - run: npm ci && npm test            # ux / application / api
-  #     # - run: pytest                      # python Lambdas
-  #     # - run: cfn-lint infrastructure/**  # CloudFormation
+  migrations:
+    name: Migrations apply + rollback (ephemeral DB)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: ci, POSTGRES_DB: ci }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s
+          --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: postgres://postgres:ci@localhost:5432/ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Skip if no relational migrations
+        id: gate
+        run: |
+          if [ -d migrations ] && ls migrations/* >/dev/null 2>&1; then echo "run=true" >> "$GITHUB_OUTPUT";
+          else echo "run=false" >> "$GITHUB_OUTPUT"; echo "No migrations/ — nothing to apply (e.g. DynamoDB feature)."; fi
+      # Proves the migration actually applies AND rolls back — not that an agent
+      # said it would. Replace the two commands with your migration runner
+      # (e.g. npm run migrate:up / migrate:down, alembic upgrade/downgrade, sqitch).
+      - name: Apply then roll back
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          echo "TODO: project migration runner, e.g.:"
+          echo "  npm --prefix api run migrate:up && npm --prefix api run migrate:down"
+          # The job must FAIL if either direction errors. Wire your runner above.
+
+  sca:
+    name: Dependency scan + SBOM (supply chain)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - name: npm audit (fail on high/critical)
+        run: |
+          for d in ux api application; do
+            [ -f "$d/package-lock.json" ] || continue
+            ( cd "$d" && npm ci --no-audit --no-fund && npm audit --audit-level=high )
+          done
+      - name: pip-audit (if python present)
+        run: |
+          if ls **/requirements*.txt >/dev/null 2>&1; then
+            pip install pip-audit >/dev/null && pip-audit -r $(ls **/requirements*.txt | head -1) || exit 1
+          else echo "no python deps"; fi
+      # SBOM: generate a CycloneDX/Syft SBOM and upload as an artifact for audit.
+      # Replace with your SBOM tool (e.g. anchore/sbom-action or cyclonedx).
+      - name: SBOM (placeholder)
+        run: |
+          echo "TODO generate + upload SBOM (anchore/sbom-action or cyclonedx-cli)"
+
+  all-green:
+    name: all-green
+    needs: [secret-scan, verify, migrations, sca]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "All required checks passed."
+
+  # ── DevOps adds deploy/smoke jobs here (post-deploy health check proves a
+  #    deploy is live; see devops-engineer.md). Deploy jobs require the
+  #    environment's own approval, separate from PR merge. ──

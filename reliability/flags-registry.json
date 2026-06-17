@@ -1,0 +1,16 @@
+{
+  "_comment": "Every flag has an owner, type, default, rollout, and an expiry. Flags without owner+expiry are not allowed. Remove flags once at 100% and stable.",
+  "flags": [
+    {
+      "name": "saved_search_alerts",
+      "type": "release",
+      "owner": "human:jim",
+      "default": false,
+      "rollout": "10%",
+      "kill_switch": true,
+      "created": "2026-06-01",
+      "expiry": "2026-08-01",
+      "notes": "Ramp 1->10->50->100 watching alert-delivery SLO; kill switch disables dispatch."
+    }
+  ]
+}

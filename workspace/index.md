@@ -27,6 +27,9 @@
 - Account / region: <id>
 - Secrets store (Secrets Manager / KMS): <console link>
 
+## Codebase (brownfield)
+- Codebase map: workspace/codebase-map.md
+
 ## Observability
 - Slack channel(s): <#channel>
 - Dashboards / alerts: <url>

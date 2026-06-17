@@ -1,24 +1,63 @@
 {
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Read(**/credentials)",
+      "Read(**/credentials.*)",
+      "Read(**/id_rsa*)",
+      "Bash(curl:*)",
+      "Bash(wget:*)",
+      "Bash(rm -rf:*)"
+    ],
+    "ask": [
+      "Bash(aws iam:*)",
+      "Bash(aws kms:*)",
+      "Bash(aws secretsmanager:*)",
+      "Bash(aws *delete*:*)",
+      "Bash(aws *terminate*:*)",
+      "Bash(git push:*)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
         "matcher": "Agent",
         "hooks": [
-          { "type": "command", "command": "./.claude/hooks/budget-threshold.sh check" }
+          {
+            "type": "command",
+            "command": "./.claude/hooks/budget-threshold.sh check"
+          }
         ]
       }
     ],
     "SubagentStop": [
       {
         "hooks": [
-          { "type": "command", "command": "./.claude/hooks/budget-threshold.sh update" }
+          {
+            "type": "command",
+            "command": "./.claude/hooks/budget-threshold.sh update"
+          },
+          {
+            "type": "command",
+            "command": "./.claude/hooks/verify-gate.sh"
+          },
+          {
+            "type": "command",
+            "command": "./.claude/hooks/loop-guard.sh"
+          }
         ]
       }
     ],
     "Stop": [
       {
         "hooks": [
-          { "type": "command", "command": "./.claude/hooks/budget-threshold.sh update" }
+          {
+            "type": "command",
+            "command": "./.claude/hooks/budget-threshold.sh update"
+          }
         ]
       }
     ]

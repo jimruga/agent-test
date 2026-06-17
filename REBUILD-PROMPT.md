@@ -44,3 +44,19 @@ Paste the block below to Claude (Claude Code recommended) to regenerate this ent
 > **13. Examples + README.** Add a README (layout, launch with `claude --agent pm`, connectors, skills, secrets, branch policy, budgets, gates), plus two worked PRDs and end-to-end walkthroughs through all five gates — one EC2/RDS feature with a relational migration, and one serverless feature (Lambda + API Gateway + DynamoDB, no relational migration) — each showing the gates, the feedback loops, and a budget event.
 >
 > Verify the budget hook logic before finishing. Output everything as files.
+
+
+---
+
+## Hardening appendix (v2 — production-grade additions)
+
+The 13-point prompt above rebuilds the base team. To reproduce the hardened current state, also ask for:
+
+- **Verification you can't fake (#1):** a single `verify.sh` (lint/typecheck/test/coverage + an anti-tamper diff check that rejects added `.only`/`.skip`/deleted tests), run in CI, with an `all-green` required status check and `scripts/setup-branch-protection.sh` (required check + independent review via `require_last_push_approval`).
+- **Compliance + segregation of duties (#2):** agents make, humans authorize (gates 1/2/3/5); a read-only **compliance** agent that attests but never approves; a **hash-chained, tamper-evident audit trail** (`audit-append.sh`, `--verify`) externalized to a WORM store; a control matrix mapping to SOX/SOC2/PCI/ISO/NIST; `CODEOWNERS`.
+- **Agent-fleet security (#3):** least-privilege per agent (`disallowedTools`), an untrusted-content/injection boundary (tool-sourced content is data, not instructions), `permissions` deny/ask rules, supply-chain SCA/SBOM in CI; sandbox + scoped IAM + egress allowlist as operational controls.
+- **Evals:** a harness (`evals/run.py`) with deterministic control tests (gate CI) and LLM detection cases (planted vuln/bug/injection, pass-rate vs baseline, regression-flagged).
+- **Reliability (#4):** feature flags + progressive delivery + kill switch; an **sre** agent owning SLOs/error budgets and incident command (mitigate-first); blameless postmortems; an **emergency-change** control (human-authorized, audit-logged, retroactively reviewed); DR.
+- **Orchestration & economics:** a portfolio backlog with a WIP limit, parallel dispatch, resume-from-state, a thrash `loop-guard`; **risk-tiered gating** so cheap changes skip the heavy machinery; an **architect** (coherence) and **analyst** (ROI keep/iterate/kill) role; and a FLEET-OPS discipline that measures whether the OPEX actually drops.
+
+Net: 15 agents, ~11 skills, hooks for budget/verify/audit/loop-guard, CI + branch protection, and a compliance/security/reliability/governance doc set. Build it as files; verify the hook and verify logic before finishing.

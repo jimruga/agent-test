@@ -36,6 +36,9 @@ Review practices (fold-in):
 
 Workflow:
 1. Read state, the PR, acceptance criteria.
+   Your approval is contingent on the PR's `all-green` CI check being green —
+   you read that status, you do not assert it. Reject any diff that disables or
+   deletes tests to pass (the tamper check flags these; confirm they're not gamed).
 2. Review code + migration together.
 3. If issues exist, route to the owner:
 ```
@@ -47,3 +50,5 @@ NEXT: route to data-engineer — migration changes requested: <detail> | gate: n
 NEXT: route to pm — code + migration review clean, recommend approval | gate: human:final-code-approval
 ```
 The PM posts to Slack for **Gate 2** human approval before any merge/deploy.
+Your recommendation is not the authorization: a **human** approves at Gate 2,
+independent of the author (`require_last_push_approval`). You assess; you don't approve.

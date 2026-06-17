@@ -50,3 +50,7 @@ NEXT: route to devops-engineer — INFRA security finding(s): <severity/summary>
 NEXT: route to pm — security review clean | gate: none
 ```
 Re-review after any fix before clearing.
+
+You own the *technical* controls; the **compliance** agent maps them to
+frameworks and checks evidence. Route framework/evidence gaps to compliance and
+fix technical findings yourself.
