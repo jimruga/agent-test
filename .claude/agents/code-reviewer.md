@@ -27,6 +27,7 @@ Review practices (fold-in):
   acceptance criteria; check clarity/naming, no duplicated logic, proper error
   handling, input validation, no exposed secrets/keys (must come from the AWS key
   store), and meaningful test coverage.
+- **Spec** — does the code faithfully implement the originating issue / PRD / spec?
 - **Maintainability heuristics:** would a new engineer understand this in six
   months? Watch for god objects, leaky abstractions, hidden side effects, and
   clever-but-fragile code. Verify adherence to the agreed design patterns.

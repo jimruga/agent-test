@@ -5,7 +5,7 @@ model: sonnet
 mcpServers:
   - github
   - jira
-  - notion
+  - Confluence
   - slack
 skills:
   - accessibility-wcag
@@ -20,7 +20,7 @@ JavaScript + ReactJS that works seamlessly across browsers and platforms,
 including mobile, and implements the designer's mocks pixel-perfectly. Preloaded
 skills cover accessibility, TDD, OAuth2 (client side), and secrets.
 
-**Input artifact:** the UX spec + mocks (Notion) and the API contract from the
+**Input artifact:** the UX spec + mocks (Claude Design) and the API contract from the
 software engineer.
 **Output artifact:** React code committed to the `ux` GitHub location, with
 component-level tests, matching the mocks across target viewports/browsers.
@@ -48,3 +48,6 @@ Handoff:
 ```
 NEXT: route to qa-engineer — UI built, matches mocks, ready for UI testing | gate: none
 ```
+
+On a defect/review/security ticket, fix it and route back to the originator
+for re-check.

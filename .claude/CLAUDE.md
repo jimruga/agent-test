@@ -4,26 +4,76 @@ This file is loaded into every agent's context (the PM main session and all
 subagents). It is the single source of truth for stack, systems of record,
 the shared workspace, ownership, human gates, budgets, and routing. Read it first.
 
+Claude should extend existing patterns, not introduce new ones. When in doubt, 
+inspect an existing feature folder before creating a new pattern.
+
 > **Orchestration model:** The Product Manager runs as the **main session**
 > (`claude --agent pm`). It is the only thread that can dispatch subagents.
 > Subagents cannot call each other — every handoff goes back through the PM.
 
 ---
+## Stack (one-line orientation)
+Node.js ~26.5.0, npm ~12.0.0, Typescript ~7.0.2, React ~19.2.7, Fastify ~5.10.0, Knex ~3.3.0
+
+## Commands
+
+Humans/CI use `npm` scripts (or `make`). **Claude Code MUST use the `make claude-*`
+variants** — plain `npm run` hits `spawn EPERM` under the Claude Code sandbox; the
+`claude-*` targets invoke binaries directly. Always prepend `claude-` to a `make`
+request (e.g. "run `make check`" → `make claude-check`). Exceptions with no
+`claude-` variant run as-is: `make install`, `make dev`, `make help`, `make clean`.
+
+| Purpose                                               | Claude Code                                 |
+| ----------------------------------------------------- | ------------------------------------------- |
+| Verification gate (typecheck + lint + test + build)   | `make claude-check`                         |
+| Vitest unit tests                                     | `make claude-test`                          |
+| Vitest browser-mode tests                             | `make claude-test-browser`                  |
+| Biome check / autofix                                 | `make claude-lint` / `make claude-lint-fix` |
+| `tsc --noEmit` across workspaces                      | `make claude-typecheck`                     |
+| Playwright e2e                                        | `make claude-test-e2e`                      |
+| Regenerate `apps/web/src/client/` from `openapi.yaml` | `make claude-gen-client`                    |
+| Regenerate TanStack Router route tree                 | `make claude-routes`                        |
+
+**Work is done when `make claude-check` passes.** If you can't run it locally, CI
+will — but don't push without trying.
+
+## Cross-cutting rules (always apply)
+- **Security** All code must be verified to not be in violation of the OWASP top ten vulnerabilities
+- **Named exports only.** No default exports anywhere (route files export a named `Route`).
+- **Never hand-edit generated code** — `apps/web/src/client/**` and `routeTree.gen.ts`.
+  Change `apps/api/openapi.yaml` + `make claude-gen-client`, or `make claude-routes`.
+- **Don't add new state libraries** (Redux, Jotai, MobX, zundo, …).
+- **Don't add auth, charts, table, or animation libraries without discussion.**
+- **Feature isolation.** Import a feature only via its `index.ts` barrel.
+- **Never reference gitignored files from checked-in code or docs.** A path that
+  isn't committed (see `.gitignore`) won't exist for teammates or CI, so comments,
+  docs, and code must not point at one. Put durable rationale in a committed home
+  (an ADR, a `claude-feature-notes/` entry, or the doc itself) and link that.
 
 ## Technology stack
-
+> TODO: missing Salesforce, Marketo, Netsuite, Arena, Jira, Odoo?, Stripe, EasyPost, Mailchimp, Twilio, Appcues
 - **Compute:** AWS EC2 for long-running, context-sensitive apps; AWS Lambda for
   short, on-demand, stateless work.
 - **Cache:** Redis (ElastiCache) where a caching layer is justified.
 - **APIs:** RESTful, secured with OAuth2. Prefer AWS-native services for tooling;
   use third-party OAuth providers when uptime/resilience requires it. Apply rate
-  limiting and a WAF in front of public endpoints.
-- **Frontend:** JavaScript + ReactJS.
+  limiting and a WAF in front of public endpoints. Typescript + NodeJS + Fastify.
+- **Frontend:** Typescript + ReactJS.
 - **Data:** AWS RDS (PostgreSQL) by default; DynamoDB (NoSQL) where access
-  patterns justify it.
+  patterns justify it. Connections and querying using Knex.
 - **Infrastructure:** AWS CloudFormation. All infra is code — no console changes.
+- **Application Level Integration:** Mulesoft. Integration for connection of 3rd party systems to the application, and between 3rd party systems.
 - **Production hardening:** intrusion prevention and DDoS protection (AWS WAF +
   Shield, rate limiting, least-privilege IAM, private subnets).
+
+## Monitoring & Alerting
+- **Click tracking & User Activity:** Heap; application click tracking and user activity tracking
+- **Exception & Error capture :** Sentry; application exception handling and error trapping
+- **Application Metrics & Monitoring:** Datadog; application metrics and threshold based monitoring
+- **Log Shipping Agent:** Logz.io; centralized log storage and analysis
+
+## Frameworks
+> TBD
 
 ## Secrets & keys
 
@@ -34,12 +84,11 @@ the shared workspace, ownership, human gates, budgets, and routing. Read it firs
   runtime via IAM roles. (See the `secrets-management` skill.)
 
 ## Systems of record (accessed via MCP connectors)
-
+> TODO: Salesforce, Netsuite, Marketo, Jira
 - **Slack** — all human communication and observability/alerting.
 - **GitHub** — code, in separate component locations: `application`, `api`, `ux`,
   `tests`, `infrastructure`, and `migrations` (separate repos or top-level dirs).
-- **Notion** — PRD, implementation plans, UX mocks, deployment plans, metrics
-  plans, the deploy/rollback **runbook**, and documentation.
+- **Confluence** — the deploy/rollback **runbook**, and documentation.
 - **Jira** — feature tickets and bug tickets.
 - **AWS** — infrastructure, deployments, monitoring, secrets/keys.
 
@@ -56,7 +105,7 @@ lightweight bus that lets a freshly-spawned subagent orient instantly:
 
 - `workspace/STATE.md` — current phase, active feature, current owner,
   what it's blocked on, pending human gate, and budget status.
-- `workspace/index.md` — canonical links (Notion, Jira, GitHub repos, dashboards).
+- `workspace/index.md` — canonical links (Confluence, Jira, GitHub repos, dashboards).
 - `workspace/handoff-log.md` — append-only handoffs, decisions, approvals.
 
 **Every subagent starts with empty context. First action: read
@@ -133,7 +182,8 @@ Monitoring is handled by the **budget-threshold hook** (deterministic) and the
    (per environment) vs the estimate and routes overage to DevOps and the human.
 
 ## Compliance & segregation of duties
-
+> TODO: Need to validate that WCAG 2.2 Level AA is conforming - if this fails then we need a skill added to give
+> to the software engineer and the designer and the pm
 Not legal advice; this makes the team auditable, your assessors certify it. See
 `compliance/control-matrix.md`, `segregation-of-duties.md`, `audit-trail.md`.
 
@@ -141,10 +191,12 @@ Not legal advice; this makes the team auditable, your assessors certify it. See
   independent controls are **human and required**: authorize the change (Gate 1),
   approve the merge independent of the author (Gate 2), authorize the prod deploy
   separately from the merge (Gate 3), accept the result (Gate 5). Agents assess and
-  recommend; they never hold authorization. (NIST AC-5, ISO A.5.3, SOX ITGC, PCI 6.4.2.)
+  recommend; they never hold authorization. (NIST AC-5, ISO A.5.3, SOX ITGC, PCI 6.4.2.
+  , WCAG 2.2 Level AA)
 - **Scope determination.** At the PRD, the compliance agent determines whether the
   change touches financial-reporting data (SOX), cardholder data (PCI), or PII
-  (privacy); that sets which controls and how strict the gates are.
+  (privacy), accessibility (WCAG 2.2 Level AA); that sets which controls and how 
+  strict the gates are.
 - **Compliance agent attests, never approves.** Read-only; checks evidence
   completeness per change and routes gaps to the human.
 - **Audit trail is the record.** Authorizations and material actions are recorded
@@ -220,7 +272,7 @@ proceeds past its gate without that recorded approval. **Which gates apply depen
 the change's risk tier** (`governance/risk-tiers.md`): trivial/low changes auto-merge
 on green CI + review and skip the heavy agents and the human gate; standard runs the
 full set; high/regulated add architect, deep security, compliance, and dual
-authorization. Default to Standard; tier up when unsure. Gates 1/2/3/5 are the
+authorization. Default to Standard; tier up when unsure. Gates 1/2/3/5/6/9 are the
 change-control / authorization points for SOX and friends — the PM also records
 each with identity + timestamp + commit SHA in the **audit trail** via
 `audit-append.sh`, and the deploy authorizer (Gate 3) should differ from the merge
@@ -228,15 +280,23 @@ approver (Gate 2) for financial-reporting scope.
 
 1. **Requirements & PRD review** — before any design/build. Approving the PRD also
    approves the token build budget (1) and the AWS runtime cost estimate (2).
-2. **Final code review approval** — after code-reviewer and security pass, before
+2. **Design review** - after the PRD is approved, before the technical design document
+   is written.
+3. **Technical Design Document (Tdd) Review** - after the Design of UX is approved,
+   before the Epics and Stories are built.
+4. **Story Review** - before implementation, Approving the Epics/Stories to be
+   created in Jira.
+5. **Pull Request (PR) Acceptance** — after code-reviewer and security pass, before
    merge/deploy. Covers the code **and any DB migration in the same PR**. Requested
    only once the PR's `all-green` check is green; branch protection enforces no
    merge without it plus an independent approval.
-3. **DevOps deployment plan review** — before executing any deployment. "Deployed
-   to staging" is proven by an automated post-deploy health/smoke check, not an
-   agent claim; a failed check auto-rolls-back.
-4. **Metrics plan review** — before instrumenting any metrics.
-5. **Acceptance sign-off** — the PM validates the shipped feature against the PRD
+6. **Infra Plan Review** — created by devops and needs to be approved before 
+   executing any Deploy. "Deployed to staging" is proven by an automated 
+   post-deploy health/smoke check, not an agent claim; a failed check auto-rolls-back.
+7. **E2E Acceptance** - after the end to end (E2E) functional tests have been run 
+   against staging and have all passed `all-green`.
+8. **Metrics Review** — before instrumenting any metrics.
+9. **User Acceptance sign-off** — the PM validates the shipped feature against the PRD
    acceptance criteria, backed by passing acceptance-tagged tests where possible;
    a human signs off before the feature is closed.
 
@@ -279,21 +339,37 @@ The PM resolves conflicts and logs the resolution in `handoff-log.md`. If the
 approval before continuing.
 
 ## Lifecycle (PM-driven)
+> TODO: determine if we need a step to validate metrics are working properly prior to release
+> or wether this is incorporated into the E2E Acceptance testing
+> none | 1 PRD Review | 2 Design Review | 3 Tdd Review | 4 Story Review | 5 PR Acceptance | 6 Infra Plan Review  | 7 E2E Acceptance | 8 Metrics Review | 9 User Acceptance 
 
 1. Requirements → PRD with acceptance criteria + token estimate + AWS cost
    estimate (PM + designer + devops estimate) → **[Gate 1: PRD]**
-2. UX design (designer) → mocks in Notion
+2. UX design (designer) → mocks in Claude Design → **[Gate 2: Design Review]**
 3. Architecture (software-engineer; **architect** reviews coherence on standard+
-   risk) → impl plan/ADR in Notion; migrations planned by data-engineer; metrics plan
-   (data-engineer) → **[Gate 4: metrics plan]**
+   risk) → impl plan/ADR in `docs/adr`; migrations planned by data-engineer; metrics plan
+   (data-engineer); API contracts; data model → **[Gate 3: Tdd Review]**
+5. PM  → fictiv-to-stories → **[Gate 4: Story Review]**
 4. Implementation (software-engineer + frontend-engineer), test-driven; migrations
    authored by data-engineer to `migrations`
 5. Testing (qa-engineer) → defects route to software-engineer
 6. Review (code-reviewer + security, code + migrations together) → findings route
-   back → **[Gate 2: code approval]** → merge per branch policy
-7. Deployment plan + runbook (devops) → **[Gate 3: deploy plan]** → staging →
+   back → **[Gate 5: PR Acceptance]** → merge per branch policy
+7. Deployment plan + runbook (devops) → **[Gate 6: Infra Plan Review]** → staging →
    smoke test → **progressive rollout behind a feature flag** (canary→ramp, SLO-
    watched, kill switch ready); devops owns rollback, sre owns the guardrails
+    → **[Gate 7: E2E Acceptance]**
 8. Observe & support (data-engineer metrics, support-writer docs + triage); **analyst**
    computes realized ROI → keep/iterate/kill to the PM (`governance/roi-loop.md`)
-9. **[Gate 5: acceptance sign-off]** against PRD acceptance criteria → close
+9. **[Gate 9: User Acceptance sign-off]** against PRD acceptance criteria → close
+
+## How guidance is organized (read this once)
+
+- **`.claude/rules/`** — modular, mostly path-scoped. A rule enters context only
+  when you read a matching file, so backend work never loads UI conventions.
+  Unscoped rules (commands, verification, plan workflow, global never-do) load
+  every session.
+- **`.claude/skills/`** — multi-step procedures, loaded on demand: `feature-slice`,
+  `add-endpoint`, `i18n-add-string`, `shadcn-add` (plus `grilling`/`grill-me`).
+- **Plan workflow** — every approved plan is filed to `claude-feature-notes/`
+  before execution. See `.claude/rules/plan-workflow.md`.

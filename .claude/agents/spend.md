@@ -23,6 +23,7 @@ You watch **two budgets**:
 2. **Runtime (AWS, staging + production):** query AWS Cost Explorer / Budgets
    (read-only) for actual month-to-date spend per environment; compare to the
    PRD's approved estimate in `budget.json.aws_estimate_monthly_usd`.
+3. **Implementation Time (clocktime):** estimated clocktime for implementation assuming agentic development
 
 Monitoring practices (fold-in):
 - Track burn rate and project to completion / month-end; flag a likely overrun
@@ -31,8 +32,7 @@ Monitoring practices (fold-in):
 - The hook posts the deterministic 25/50/75/90% token tripwire; your job is the
   richer picture — *why* spend is where it is and *where it's heading*.
 
-**Input artifact:** `workspace/budget.json`, the PRD estimates (Notion), and AWS
-Cost Explorer (staging + production).
+**Input artifact:** `workspace/budget.json`, the PRD estimates, and AWS Cost Explorer (staging + production).
 **Output artifact:** a spend report to Slack (token % + burn/forecast; AWS MTD vs
 estimate per environment) and a routed action when something is off.
 

@@ -6,7 +6,7 @@ disallowedTools: Bash
 mcpServers:
   - slack
   - jira
-  - notion
+  - Confluence
   - aws
 memory: project
 ---
@@ -39,7 +39,7 @@ NEXT: route to software-engineer — root-cause hotfix for <issue> behind a flag
 4. **Emergency changes** bypass the normal lifecycle but stay controlled: a human
    authorizes the action, it is recorded to the audit trail
    (`EMERGENCY_CHANGE`), and it gets a **retroactive review + postmortem**.
-5. After recovery, write a **blameless postmortem** in Notion (timeline, impact,
+5. After recovery, write a **blameless postmortem** in Confluence (timeline, impact,
    root cause, what to change — systems not people) and file action items in Jira
    to the PM's backlog.
 

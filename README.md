@@ -75,7 +75,7 @@ test-data. Everything single-agent is folded into that agent's prompt.
 ## Connectors (MCP servers)
 
 Referenced by name in frontmatter: `slack`, `github`, `jira` (already connected),
-`notion`, `aws`. Connect them in Claude Code and keep names matching.
+`Confluence`, `aws`. Connect them in Claude Code and keep names matching.
 
 ## Secrets & keys
 

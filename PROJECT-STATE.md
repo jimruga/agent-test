@@ -1,6 +1,6 @@
 # Agent Development Team — Project State
 
-*Record of the current end state. Paste into Notion (it imports Markdown, including the tables below).*
+*Record of the current end state. Paste into Confluence (it imports Markdown, including the tables below).*
 
 **What it is:** a PM-orchestrated team of Claude Code subagents that takes a feature from requirements through design, build, test, review, security, deploy, and support — with human approval at five gates and automated budget controls.
 
@@ -13,13 +13,13 @@
 | Agent | Role | Owns | Input → Output | Model | Mode |
 |---|---|---|---|---|---|
 | **pm** | Product manager / orchestrator (main session) | Requirements, PRD, business outcomes, token build budget *decision*, conflict resolution, all gate enforcement | Feature request / Jira epic → approved PRD (with token + AWS estimates) + orchestrated delivery | opus | read/write |
-| **product-designer** | UX/UI design | UX | Approved PRD → UX spec + mocks (Notion) | sonnet | read/write |
+| **product-designer** | UX/UI design | UX | Approved PRD → UX spec + mocks (Claude Design) | sonnet | read/write |
 | **software-engineer** | Backend / full-stack | **Maintainability** + app architecture | PRD + UX + API contract + feedback → code (`application`/`api`) + ADR, tests-first | opus | read/write |
 | **frontend-engineer** | ReactJS UI | — | UX spec + mocks + API contract → React code (`ux`) + component tests | sonnet | read/write |
 | **qa-engineer** | Test automation | Test suite | Feature + acceptance criteria + test data → tests (`tests`), report, Jira bugs | sonnet | read/write |
-| **devops-engineer** | AWS infra & network security | **Infra run cost**, **rollbacks + runbook** | Architecture + approved code → CloudFormation (`infrastructure`), deploy plan + rollback runbook (Notion), monitoring; AWS cost estimate (staging+prod) | opus | read/write |
-| **data-engineer** | Metrics, ROI, test data | **DB migrations** (`migrations`) | PRD + data model → migrations, metrics plan (Notion), instrumentation, fabricated datasets | sonnet | read/write |
-| **support-writer** | Training & support | — | User feedback + shipped behavior → triaged Jira tickets + docs/training (Notion) | sonnet | read/write |
+| **devops-engineer** | AWS infra & network security | **Infra run cost**, **rollbacks + runbook** | Architecture + approved code → CloudFormation (`infrastructure`), deploy plan + rollback runbook (Confluence), monitoring; AWS cost estimate (staging+prod) | opus | read/write |
+| **data-engineer** | Metrics, ROI, test data | **DB migrations** (`migrations`) | PRD + data model → migrations, metrics plan `docs\tdd`, instrumentation, fabricated datasets | sonnet | read/write |
+| **support-writer** | Training & support | — | User feedback + shipped behavior → triaged Jira tickets + docs/training (Confluence) | sonnet | read/write |
 | **code-reviewer** | Code review gate | — | PR (code **+ migration together**) → structured review; routes fixes | opus | **read-only** |
 | **security** | App + infra security gate | **Security** | Code + migration + infra → severity-tagged findings; app→engineer, infra→devops | opus | **read-only** |
 | **spend** | Cost monitor | — | `budget.json` + AWS Cost Explorer → spend report; routes overage to PM/devops | sonnet | **read-only** |
@@ -55,10 +55,10 @@ Read-only agents enforce this with `disallowedTools: Write, Edit`.
 ## Shared workspace & systems of record
 
 - **`workspace/STATE.md`** — current phase, owner, blocked-on, pending gate, budget status.
-- **`workspace/index.md`** — canonical links to Notion/Jira/GitHub/AWS/dashboards.
+- **`workspace/index.md`** — canonical links to Confluence/Jira/GitHub/AWS/dashboards.
 - **`workspace/handoff-log.md`** — append-only handoffs, decisions, approvals.
 - **`workspace/budget.json`** — token allocation/usage + AWS estimate (maintained by the hook).
-- **Slack** — human comms + observability/alerts. **GitHub** — code, in locations `application`, `api`, `ux`, `tests`, `infrastructure`, `migrations`. **Notion** — PRD, plans, mocks, runbook, docs. **Jira** — feature + bug tickets. **AWS** — infra, deploys, monitoring, secrets/keys. (Each is an MCP connector referenced by name in agent frontmatter.)
+- **Slack** — human comms + observability/alerts. **GitHub** — code, in locations `application`, `api`, `ux`, `tests`, `infrastructure`, `migrations`. **Confluence** — runbook, docs. **Jira** — feature + bug tickets. **AWS** — infra, deploys, monitoring, secrets/keys. (Each is an MCP connector referenced by name in agent frontmatter.)
 
 ---
 
@@ -88,12 +88,28 @@ Feature branch → PR → **code-reviewer + security pass** → **human approval
 ---
 
 ## Human-in-the-loop gates (hard stops)
-
-1. **PRD review** — before any design/build (also approves both budgets).
-2. **Final code + migration approval** — after reviewer + security pass, before merge.
-3. **Deployment plan review** — before any deploy.
-4. **Metrics plan review** — before instrumenting.
-5. **Acceptance sign-off** — validated against PRD acceptance criteria, before closing.
+> TODO: align this
+1. **Requirements & PRD review** — before any design/build. Approving the PRD also
+   approves the token build budget (1) and the AWS runtime cost estimate (2).
+2. **Design review** - after the PRD is approved, before the technical design document
+   is written.
+3. **Technical Design Document (Tdd) Review** - after the Design of UX is approved,
+   before the Epics and Stories are built.
+4. **Story Review** - before implementation, Approving the Epics/Stories to be
+   created in Jira.
+5. **Pull Request (PR) Acceptance** — after code-reviewer and security pass, before
+   merge/deploy. Covers the code **and any DB migration in the same PR**. Requested
+   only once the PR's `all-green` check is green; branch protection enforces no
+   merge without it plus an independent approval.
+6. **Infra Plan Review** — created by devops and needs to be approved before 
+   executing any Deploy. "Deployed to staging" is proven by an automated 
+   post-deploy health/smoke check, not an agent claim; a failed check auto-rolls-back.
+7. **E2E Acceptance** - after the end to end (E2E) functional tests have been run 
+   against staging and have all passed `all-green`.
+8. **Metrics Review** — before instrumenting any metrics.
+9. **User Acceptance sign-off** — the PM validates the shipped feature against the PRD
+   acceptance criteria, backed by passing acceptance-tagged tests where possible;
+   a human signs off before the feature is closed.
 
 Plus ad-hoc human approvals for token-budget and AWS-cost overages.
 

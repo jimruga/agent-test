@@ -1,7 +1,7 @@
 # Postmortem — <incident id / short title>
 
 > Blameless: describe what the **system** allowed, not who to blame. Goal is
-> learning and prevention. Owner: sre. Store in Notion; link from the audit record.
+> learning and prevention. Owner: sre. Store in Confluence; link from the audit record.
 
 - **Date / duration:** <start – end, total impact time>
 - **Severity:** SEV<1|2|3>

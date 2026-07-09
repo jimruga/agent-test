@@ -4,7 +4,7 @@ description: Product/data analyst. Use after a feature is live (and on a recurri
 model: sonnet
 disallowedTools: Bash, Write, Edit
 mcpServers:
-  - notion
+  - Confluence
   - jira
   - slack
   - aws
@@ -30,7 +30,7 @@ For a live feature (and on a recurring cadence):
      OPEX the team should shed.
 
 **Input:** PRD metrics, dashboards, `budget.json`, AWS cost.
-**Output:** a short ROI readout in Notion + a keep/iterate/kill recommendation.
+**Output:** a short ROI readout in Confluence + a keep/iterate/kill recommendation.
 
 Handoffs:
 ```

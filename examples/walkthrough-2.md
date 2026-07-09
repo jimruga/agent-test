@@ -14,7 +14,7 @@ claude --agent pm
 ---
 
 ## Phase 0 — Requirements (PM)
-PM writes the PRD to Notion; sets `allocated_tokens: 1_600_000`,
+PM writes the PRD to Confluence; sets `allocated_tokens: 1_600_000`,
 `hard_cap_tokens: 2_000_000`, and the serverless AWS estimate in `budget.json`.
 
 **GATE 1 — PRD review.**
@@ -26,7 +26,7 @@ Minimal internal events console only (read-only). Lighter than PRD #1.
 `> NEXT: route to software-engineer — API contract for signed intake + read API + event schema | gate: none`
 
 ## Phase 2 — Architecture + data (software-engineer, data-engineer)
-- software-engineer: HTTP API (API Gateway) → intake Lambda (HMAC verify), normalize Lambda, EventBridge fan-out; OAuth2 on the read API. ADR in Notion.
+- software-engineer: HTTP API (API Gateway) → intake Lambda (HMAC verify), normalize Lambda, EventBridge fan-out; OAuth2 on the read API. ADR in Confluence.
   ▶ **No EC2** — picks Lambda for all compute (short, on-demand). Redis not used.
   `> NEXT: route to data-engineer — DynamoDB table + GSI design for events + dedupe | gate: none`
 - data-engineer: ▶ **No relational migration.** Instead owns the **DynamoDB table/GSI design** — PK `providerId`, SK `eventId`, dedupe via conditional write on the dedupe key, GSI for time-range-by-status. Documents capacity mode (on-demand). This design is still **reviewed in the same PR** as the code. Drafts the metrics plan (reliability, dedupe rate, latency).
@@ -66,7 +66,7 @@ Slack: `:white_check_mark: Code + DynamoDB design passed review + security; CI s
 Log: `... | code-reviewer -> human | recommend approval | gate: human:gate-2-code | APPROVED by Jim`
 
 ## Phase 6 — Deployment (devops-engineer)
-CloudFormation: API Gateway + Lambdas + DynamoDB (on-demand) + EventBridge + WAF + Shield. Deployment plan + rollback runbook to Notion. ▶ Cheaper, usage-scaled.
+CloudFormation: API Gateway + Lambdas + DynamoDB (on-demand) + EventBridge + WAF + Shield. Deployment plan + rollback runbook to Confluence. ▶ Cheaper, usage-scaled.
 
 **GATE 3 — deployment plan review.**
 Slack: `:rocket: Deploy plan: staging -> smoke -> prod, rollback runbook linked. Prod est $180/mo (scales with volume). Approve?`

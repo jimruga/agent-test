@@ -14,7 +14,7 @@ claude --agent pm
 ---
 
 ## Phase 0 — Requirements (PM, main session)
-PM writes the PRD to Notion, sets `allocated_tokens: 2_400_000`,
+PM writes the PRD to Confluence, sets `allocated_tokens: 2_400_000`,
 `hard_cap_tokens: 3_000_000` and the AWS staging+prod estimate in
 `workspace/budget.json`, asks DevOps for the cost estimate.
 
@@ -23,14 +23,14 @@ Slack: `:clipboard: PRD "Saved Search Alerts" ready. Build budget 2.4M tokens (c
 Log: `... | pm -> human | PRD + budgets ready | gate: human:gate-1-prd | APPROVED by Jim`
 
 ## Phase 1 — Design (product-designer)
-Reads PRD; produces flows + mocks + component inventory in Notion (WCAG AA in spec).
+Reads PRD; produces flows + mocks + component inventory in Confluence (WCAG AA in spec).
 `> NEXT: route to software-engineer — API/data contract needed for save/list/delete + scheduled check | gate: none`
 (PM also routes the mocks to frontend later.)
 
 ## Phase 2 — Architecture + data (software-engineer, data-engineer)
-- software-engineer: API contract (OAuth2-protected REST), data model, ADR in Notion. Picks Lambda for the scheduled match-check, EC2 for the app API. Redis for hot saved-search reads.
+- software-engineer: API contract (OAuth2-protected REST), data model, ADR in Confluence. Picks Lambda for the scheduled match-check, EC2 for the app API. Redis for hot saved-search reads.
   `> NEXT: route to data-engineer — schema needs saved_searches + alert_log tables; migration please | gate: none`
-- data-engineer: authors the migration to the `migrations` location (forward + rollback); drafts the metrics plan (AC5 metrics) in Notion.
+- data-engineer: authors the migration to the `migrations` location (forward + rollback); drafts the metrics plan (AC5 metrics) in Confluence.
 
 **GATE 4 — metrics plan review.**
 Slack: `:bar_chart: Metrics plan ready: activation, CTR, return-visit ROI. Approve before instrumenting?`
@@ -64,7 +64,7 @@ Slack: `:white_check_mark: Code + migration for Saved Search Alerts passed revie
 Log: `... | code-reviewer -> human | recommend approval | gate: human:gate-2-code | APPROVED by Jim` → merge per branch policy.
 
 ## Phase 6 — Deployment (devops-engineer)
-Authors/extends CloudFormation; writes deployment plan + rollback runbook to Notion with the staging+prod cost.
+Authors/extends CloudFormation; writes deployment plan + rollback runbook to Confluence with the staging+prod cost.
 
 **GATE 3 — deployment plan review.**
 Slack: `:rocket: Deploy plan ready: staging -> smoke -> prod, rollback runbook linked. Prod est $520/mo. Approve?`
@@ -73,7 +73,7 @@ Then: deploy staging → smoke test → production. devops owns rollback if need
 
 ## Phase 7 — Observe & support
 - data-engineer turns on the approved instrumentation; dashboards + alerts to Slack.
-- support-writer publishes the how-to doc in Notion and triages incoming feedback into Jira.
+- support-writer publishes the how-to doc in Confluence and triages incoming feedback into Jira.
 - spend agent: `AWS prod MTD $61 (partial month), trending ~$498/mo vs $520 est — within budget.`
 
 ## Phase 8 — Acceptance

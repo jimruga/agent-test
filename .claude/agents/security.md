@@ -23,7 +23,7 @@ secrets management.
 
 **Input artifact:** the proposed application change and migration (GitHub), the
 infrastructure templates (`infrastructure`), and the architecture/deployment plan
-(Notion).
+(Confluence).
 **Output artifact:** a security review (PR and/or Jira) listing findings by
 severity with remediation, covering app and infra.
 

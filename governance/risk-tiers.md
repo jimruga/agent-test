@@ -12,8 +12,8 @@
 | **Trivial** | docs, copy, comments, a change fully behind an off flag | CI `all-green` + 1 review; **auto-merge on green**, no human gate | engineer, reviewer |
 | **Low** | isolated bugfix, internal-only, no data/contract change | normal CI + review + security scan; **one** human approval (Gate 2) | engineer, qa, reviewer, security |
 | **Standard** | a typical user-facing feature (the default) | full 5-gate lifecycle; architect at design | the core team |
-| **High** | auth, payments path, schema migration, infra/security change, cross-service | standard **+ architect sign-off + security deep review + Gate 3 deploy authorizer ≠ Gate 2 approver** | + architect, + security, + sre |
-| **Regulated** | touches financial-reporting data (SOX), cardholder data (PCI), or PII | High **+ compliance attestation + dual human authorization + full audit evidence** | + compliance |
+| **High** | auth, payments path, schema migration, infra/security change, cross-service | standard **+ architect sign-off + security deep review + Gate 10 deploy authorizer ≠ Gate 5 approver** | + architect, + security, + sre |
+| **Regulated** | touches financial-reporting data (SOX), cardholder data (PCI), or PII, or WCAG | High **+ compliance attestation + dual human authorization + full audit evidence** | + compliance |
 
 ## Rules
 - **Default to Standard**; downgrade to Trivial/Low only when the change provably

@@ -38,7 +38,7 @@ review), human approves at Gate 2.
 watching the SLIs; alert-delivery SLO recovers and holds.
 
 **Next day — Postmortem.** sre writes a blameless postmortem (postmortem-template.md)
-in Notion: timeline, ~90 min partial impact, root cause (idempotency collision under
+in Confluence: timeline, ~90 min partial impact, root cause (idempotency collision under
 retry burst), and action items — add a retry-burst load test (QA/data), add an SLO
 burn-rate alert sooner, and **add an eval case** for the collision so it can't silently
 regress. Action items filed to the PM backlog.

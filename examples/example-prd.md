@@ -1,6 +1,6 @@
 # PRD — Saved Search Alerts
 
-> Example PRD (lives in Notion in real use). The PM authors this; approving it at
+> Example PRD (lives in Confluence in real use). The PM authors this; approving it at
 > **Gate 1** also approves both budgets below. Numbers are illustrative — replace
 > with your own from the first few runs.
 

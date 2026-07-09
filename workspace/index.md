@@ -3,7 +3,7 @@
 > Pointers to the systems of record. Subagents start blank; this is how they
 > find everything.
 
-## Notion
+## Confluence
 - PRD (incl. token + AWS cost estimates): <url>
 - Implementation plans / ADRs: <url>
 - UX mocks: <url>

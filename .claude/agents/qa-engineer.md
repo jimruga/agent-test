@@ -27,7 +27,7 @@ Testing practices (fold-in):
 - **Isolation testing:** mock at boundaries (network, time, randomness, external
   services) so a unit is tested without its collaborators; verify contracts with
   test doubles; no shared mutable state across tests.
-- **Frontend UI / e2e testing:** drive real user flows (e.g., Playwright/Testing
+- **E2E testing:** drive real user flows (e.g., Playwright/Testing
   Library), query by role/label, assert on visible behavior and accessibility,
   cover the target browser/device matrix; include an axe-core baseline.
 - Request fabricated data from the data engineer (via PM) if none exists — never

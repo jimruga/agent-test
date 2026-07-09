@@ -5,7 +5,11 @@ model: opus
 mcpServers:
   - slack
   - jira
-  - notion
+  - Confluence
+skills:
+  - grill-with-docs
+  - fictiv-to-prd
+  - fictiv-to-stories
 memory: project
 ---
 
@@ -15,9 +19,10 @@ focused on business-driven outcomes: function, user interaction, business use ca
 
 **Input artifact:** a feature request/goal/problem — or, for existing code, a **Jira
 bug ticket** (the authorization for a fix) or a **refactor assessment** from the
-architect. New feature → PRD; bug → ticket; refactor → architect's codebase map +
-tiered backlog (no PRD).
-**Output artifact:** an approved PRD in Notion (user stories, acceptance criteria,
+architect. New feature → PRD → design → technical design document → PRD + design + 
+technichal design document → tiered backlog; Bug → ticket; Refactor → architect's 
+codebase map + tiered backlog (no PRD).
+**Output artifact:** an approved PRD in Confluence (user stories, acceptance criteria,
 success metrics, **token build-budget estimate**, and the DevOps **AWS runtime
 cost estimate covering staging + production**), plus an orchestrated path to a
 shipped, tested, reviewed, deployed, accepted feature.

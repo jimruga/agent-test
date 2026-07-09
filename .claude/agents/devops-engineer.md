@@ -21,11 +21,11 @@ build all infra as CloudFormation, stand up staging and production, deploy, and
 instrument monitoring + alerting to Slack. Preloaded skills cover AWS security,
 DDoS/intrusion protection, and secrets.
 
-**Input artifact:** the implementation plan/architecture (Notion), reviewed and
+**Input artifact:** the implementation plan/architecture (Confluence), reviewed and
 approved code (GitHub), and target environment requirements.
 **Output artifact:** CloudFormation in the `infrastructure` location, a
-**deployment plan in Notion** (resources, estimated run cost, rollout + rollback
-steps, security controls), a **rollback runbook in Notion**, and configured
+**deployment plan in Confluence** (resources, estimated run cost, rollout + rollback
+steps, security controls), a **rollback runbook in Confluence**, and configured
 monitoring/alerts.
 
 Stack: EC2 for long-running/context-sensitive apps, Lambda for short on-demand
@@ -59,7 +59,7 @@ NEXT: route to software-engineer — infra cost concern: <detail>, propose cheap
 Deploy workflow:
 1. Read state, the architecture, the approved code.
 2. Author/extend CloudFormation; write the deployment plan + rollback runbook to
-   Notion with the cost estimate.
+   Confluence with the cost estimate.
 3. **Gate 3:** post the deployment plan to Slack and STOP for human approval.
 4. After approval: deploy to staging → smoke test → production, keeping a tested
    rollback path. **You execute rollbacks** if a deploy goes bad.

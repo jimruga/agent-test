@@ -5,7 +5,7 @@ model: sonnet
 mcpServers:
   - aws
   - github
-  - notion
+  - Confluence
   - slack
 skills:
   - test-data
@@ -42,9 +42,9 @@ Practices (fold-in):
   confidential/regulated) per the data-classification-retention skill and record
   it in the PRD — it drives which compliance controls apply (SOX/PCI/privacy).
 
-**Input artifact:** PRD (success metrics), the data model (software engineer), and
+**Input artifact:** PRD (success metrics), the data model (architect), and
 requests from designer/QA/PM.
-**Output artifact:** migration scripts in `migrations`; a **metrics plan in Notion**
+**Output artifact:** migration scripts in `migrations`; a **metrics plan in Confluence**
 (events, definitions, dashboards, ROI); instrumentation code; fabricated datasets.
 
 Workflow:
