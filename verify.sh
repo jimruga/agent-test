@@ -25,7 +25,7 @@ tamper_check() {
   local diff added deleted
   diff="$(git diff --unified=0 "$BASE"...HEAD 2>/dev/null || git diff --unified=0 "$BASE" 2>/dev/null || true)"
   added="$(printf '%s\n' "$diff" | grep -E '^\+' \
-    | grep -Ei '(\.only\()|(it\.only)|(describe\.only)|(test\.only)|(\.skip\()|(xit\()|(xdescribe\()|(@pytest\.mark\.(skip|xfail))|(@unittest\.skip)|(\bt\.Skip(Now)?\b)' || true)"
+    | grep -Ei '(\.only\()|(it\.only)|(describe\.only)|(test\.only)|(\.skip\()|(\bxit\()|(\bxdescribe\()|(@pytest\.mark\.(skip|xfail))|(@unittest\.skip)|(\bt\.Skip(Now)?\b)' || true)"
   deleted="$(git diff --name-status "$BASE"...HEAD 2>/dev/null | grep -E '^(D|R)' | grep -Ei '(\.test\.|\.spec\.|_test\.|test_.*\.py|/tests?/)' || true)"
   if [ -n "$added" ] || [ -n "$deleted" ]; then
     echo "   FAIL: test tampering detected"
