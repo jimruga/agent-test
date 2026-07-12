@@ -8,7 +8,10 @@ import type { Knex } from 'knex'
 //
 // The running API connects as the narrower `app_runtime` role (DML only, subject
 // to FORCE ROW LEVEL SECURITY); migrations run as `app_migrator` (data-plan §2.4).
-const config: { [env: string]: Knex.Config } = {
+// Keyed by the known environments (not an index signature) so callers indexing
+// with a literal env get `Knex.Config`, not `Knex.Config | undefined` under
+// `noUncheckedIndexedAccess`.
+const config: Record<'development' | 'production', Knex.Config> = {
   development: {
     client: 'pg',
     connection: process.env.DATABASE_URL,

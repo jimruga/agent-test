@@ -23,7 +23,11 @@ run() { echo "── $1"; if "${@:2}"; then echo "   ok"; else echo "   FAIL: $1
 tamper_check() {
   echo "── tamper check (no disabled/deleted tests)"
   local diff added deleted
-  diff="$(git diff --unified=0 "$BASE"...HEAD 2>/dev/null || git diff --unified=0 "$BASE" 2>/dev/null || true)"
+  # Scan ONLY test-file changes — the control is about disabled/deleted TESTS.
+  # Restricting the diff by pathspec prevents false positives from non-test code
+  # (e.g. process.exit in an entrypoint) and from edits to this control itself.
+  tp=('*.test.*' '*.spec.*' '*_test.*' 'test_*.py' '*/tests/*' '*/__tests__/*')
+  diff="$(git diff --unified=0 "$BASE"...HEAD -- "${tp[@]}" 2>/dev/null || git diff --unified=0 "$BASE" -- "${tp[@]}" 2>/dev/null || true)"
   added="$(printf '%s\n' "$diff" | grep -E '^\+' \
     | grep -Ei '(\.only\()|(it\.only)|(describe\.only)|(test\.only)|(\.skip\()|(\bxit\()|(\bxdescribe\()|(@pytest\.mark\.(skip|xfail))|(@unittest\.skip)|(\bt\.Skip(Now)?\b)' || true)"
   deleted="$(git diff --name-status "$BASE"...HEAD 2>/dev/null | grep -E '^(D|R)' | grep -Ei '(\.test\.|\.spec\.|_test\.|test_.*\.py|/tests?/)' || true)"

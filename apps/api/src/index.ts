@@ -1,16 +1,16 @@
-import knexFactory from 'knex'
 import Redis from 'ioredis'
+import knexFactory from 'knex'
 import { uuidv7 } from 'uuidv7'
 import knexConfig from '../knexfile'
 import { buildApp } from './app'
 import { createGoogleProvider } from './auth/oauth-provider'
-import { RedisSessionStore, type RedisLike } from './auth/session-store'
+import type { OAuthClaims } from './auth/oauth-provider'
+import { type RedisLike, RedisSessionStore } from './auth/session-store'
 import { KnexUserRepository } from './auth/user-repository.knex'
 import { loadConfig } from './config/config'
 import type { AppDeps } from './deps'
 import { flagsFromEnv } from './platform/feature-flags'
 import { unwiredSecretResolver } from './platform/secrets'
-import type { OAuthClaims } from './auth/oauth-provider'
 
 // ── Composition root ────────────────────────────────────────────────────────
 // The ONLY place real implementations (Redis, Postgres, the OAuth provider) are
@@ -44,14 +44,18 @@ function ioredisAdapter(redis: Redis): RedisLike {
 // createRemoteJWKSet + jwtVerify against the provider's issuer) before production.
 // Fails closed so an unverified token can never establish a session (OWASP A08).
 const verifyIdToken = async (_idToken: string): Promise<OAuthClaims> => {
-  throw new Error('verifyIdToken not wired: implement JWKS signature + iss/aud/exp verification before deploy')
+  throw new Error(
+    'verifyIdToken not wired: implement JWKS signature + iss/aud/exp verification before deploy',
+  )
 }
 
 export function buildProdDeps(): AppDeps {
   const config = loadConfig()
   const secretResolver = unwiredSecretResolver // devops wires AWS Secrets Manager
   const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379')
-  const knex = knexFactory(knexConfig[process.env.NODE_ENV === 'production' ? 'production' : 'development'])
+  const knex = knexFactory(
+    knexConfig[process.env.NODE_ENV === 'production' ? 'production' : 'development'],
+  )
   return {
     config,
     flags: flagsFromEnv(),

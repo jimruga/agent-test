@@ -83,7 +83,12 @@ describeIntegration('KnexUserRepository (integration · real Postgres)', () => {
     const { user } = await repo.findOrCreateFromOAuth(oauthInput)
     const teamId = uuidv7()
     await knex('teams').insert({ id: teamId, name: 'Team A', created_by: user.id })
-    await knex('memberships').insert({ id: uuidv7(), team_id: teamId, user_id: user.id, role: 'owner' })
+    await knex('memberships').insert({
+      id: uuidv7(),
+      team_id: teamId,
+      user_id: user.id,
+      role: 'owner',
+    })
 
     const me = await repo.getWithMemberships(user.id)
 
@@ -95,7 +100,9 @@ describeIntegration('KnexUserRepository (integration · real Postgres)', () => {
 
   it("excludes a tombstoned (status <> 'active') user from getWithMemberships (fail closed on erasure)", async () => {
     const { user } = await repo.findOrCreateFromOAuth(oauthInput)
-    await knex('users').where({ id: user.id }).update({ status: 'deleted', deleted_at: knex.fn.now() })
+    await knex('users')
+      .where({ id: user.id })
+      .update({ status: 'deleted', deleted_at: knex.fn.now() })
 
     expect(await repo.getWithMemberships(user.id)).toBeNull()
   })

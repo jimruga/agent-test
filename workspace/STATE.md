@@ -5,11 +5,16 @@
 - **Active feature:** Team To-Do App (MVP) — collaborative multi-user task management
 - **Lifecycle phase:** architecture / technical design (Gate 2 APPROVED; working toward Gate 3 Tdd)
 - **Lifecycle phase:** implementation (Gate 4 APPROVED; building S0+S1 test-driven, behind flag)
-- **Current owner (agent):** software-engineer (applying review fix-batch before commit)
-- **Reviews done:** security (workspace/security-review-s0-s1.md) + code review (workspace/code-review-s0-s1.md). Decision: FIX-THEN-COMMIT (C1/W2 would make CI red).
-- **Fix batch (pre-merge):** C1 gitignore secrets.*; W2 knex TS loader; F1/W3 nonce fail-open; F2 PII-in-logs; W4 KnexUserRepository integration test; + timingSafeEqual, CLAUDE.md stack-line doc fix.
-- **Deploy-time (Gate 6) queue:** JWKS verify (eng), Secrets Manager IAM + Redis private/TLS/KMS + RDS/KMS + app_runtime role + rate limiting + edge headers (devops).
-- **Blocked on (after fixes):** HUMAN — commit branch + npm install (lockfile) + push + open PR → CI all-green → compliance attest → Gate 5.
+- **Current owner (agent):** HUMAN (commit for CI iter 5). Gate 5 NOT requested.
+- **All CI failures fixed; engineer verified local gate GREEN on Node 26 (typecheck/lint/65 tests).** CI on Node 20 is the binding check.
+- **Human steps (iter 5):** rm package-lock.json && npm install (openapi-ts 0.99→0.53.12); chmod +x verify.sh (edit reset it); git add -A; confirm verify.sh=100755; commit; push → CI all-green → compliance attest → Gate 5.
+- **Control changes (audit #3, #4):** verify.sh tamper-check regex anchored + scoped to test-file diffs (human-approved).
+- **Follow-ups (non-blocking):** openapi-ts config API reconcile at first gen:client; dependency-hygiene cleanup (@hey-api runtime-dep + fastify/vite misplacements).
+- **CI-greening loop count: 5** (each iter distinct real issue: exec bit→missing lock→stale lock+regex FP→typecheck/biome-scope→ ; convergent; loop-guard: no thrash).
+- **Reviews done + fixes applied:** security + code review returned; all must-fix items resolved & staged on feature/s0-s1-foundation-auth (C1 gitignore, W2 knex TS loader, F1/W3 nonce fail-closed, F2 PII-safe logs, W4 repo integration lane in all-green, + timingSafeEqual, CLAUDE.md versions). Not executed (no registry/node in sandbox) — CI is the verifier.
+- **BLOCKED ON HUMAN:** commit branch + `npm install` (lockfile) + push + open PR → CI all-green (now incl. integration lane) → then pm runs compliance attestation → request Gate 5.
+- **Deploy-time (Gate 6) queue:** JWKS real verify (eng), Secrets Manager IAM + Redis private/TLS/KMS + RDS/KMS + app_runtime role + rate limiting + edge headers (devops).
+- **Deferred to S2:** redundant memberships index (data-eng), CSRF double-submit seam.
 - **Clocktime baseline set:** O 175 / E 275 / P 455 engineer-hours (S0-S11).
 - **S0/S1 status:** authored+staged on branch feature/s0-s1-foundation-auth; ADR-0004 (bootstrap). Must-wire before Gate 6: JWKS id-token verify (security), Secrets Manager resolver + ElastiCache (devops).
 - **Gate 3 RESULT (human:Jim):** TDD APPROVED; API framework = **FASTIFY** (ADR-0003; api-conventions.md corrected Hono→Fastify in bootstrap PR); token budget raised to **6M alloc / 7M cap** (audit #2).

@@ -1,7 +1,7 @@
-import type { AppConfig } from './config/config'
 import type { OAuthProvider } from './auth/oauth-provider'
-import type { SessionStore, Clock } from './auth/session-store'
+import type { Clock, SessionStore } from './auth/session-store'
 import type { UserRepository } from './auth/user-repository'
+import type { AppConfig } from './config/config'
 import type { FeatureFlags } from './platform/feature-flags'
 
 // The composition contract. buildApp depends only on these abstractions, so the

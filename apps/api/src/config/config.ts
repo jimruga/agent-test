@@ -49,7 +49,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   for (const key of ['OAUTH_CLIENT_SECRET_ARN', 'SESSION_SECRET_ARN']) {
     const v = env[key]
     if (v && looksLikeSecretValue(key, v)) {
-      throw new Error(`${key} must be an AWS ARN reference (arn:aws:...), not a literal secret value`)
+      throw new Error(
+        `${key} must be an AWS ARN reference (arn:aws:...), not a literal secret value`,
+      )
     }
   }
 
@@ -72,7 +74,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       idleTtlSeconds: Number(env.SESSION_IDLE_TTL_SECONDS ?? 60 * 60 * 2),
       absoluteTtlSeconds: Number(env.SESSION_ABSOLUTE_TTL_SECONDS ?? 60 * 60 * 12),
     },
-    returnToAllowlist: (env.RETURN_TO_ALLOWLIST ?? '/').split(',').map((s) => s.trim()).filter(Boolean),
+    returnToAllowlist: (env.RETURN_TO_ALLOWLIST ?? '/')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
   }
 }
 
@@ -89,6 +94,8 @@ export function safeReturnTo(returnTo: string | undefined, allowlist: readonly s
   if (returnTo.startsWith('//')) return fallback
   if (returnTo.includes('\\')) return fallback
   const path = returnTo.split('?')[0]?.split('#')[0] ?? ''
-  const ok = allowlist.some((allowed) => path === allowed || path.startsWith(`${allowed.replace(/\/$/, '')}/`))
+  const ok = allowlist.some(
+    (allowed) => path === allowed || path.startsWith(`${allowed.replace(/\/$/, '')}/`),
+  )
   return ok ? returnTo : fallback
 }

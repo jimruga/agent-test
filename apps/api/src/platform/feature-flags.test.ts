@@ -14,7 +14,9 @@ describe('feature flags', () => {
   })
 
   it('reads the on-list from env (comma-separated), dark when absent', () => {
-    expect(flagsFromEnv({ FEATURE_FLAGS: 'team_todo_mvp, other' }).isEnabled(TEAM_TODO_MVP)).toBe(true)
+    expect(flagsFromEnv({ FEATURE_FLAGS: 'team_todo_mvp, other' }).isEnabled(TEAM_TODO_MVP)).toBe(
+      true,
+    )
     expect(flagsFromEnv({}).isEnabled(TEAM_TODO_MVP)).toBe(false)
   })
 })

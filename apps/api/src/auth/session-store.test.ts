@@ -22,7 +22,11 @@ describe('RedisSessionStore over InMemoryRedis', () => {
   })
 
   it('pre-auth is single-use: the second take returns null', async () => {
-    await store.putPreAuth('pa-1', { state: 's', nonce: 'n', codeVerifier: 'v', returnTo: '/' }, 600)
+    await store.putPreAuth(
+      'pa-1',
+      { state: 's', nonce: 'n', codeVerifier: 'v', returnTo: '/' },
+      600,
+    )
     const first = await store.takePreAuth('pa-1')
     expect(first?.state).toBe('s')
     expect(await store.takePreAuth('pa-1')).toBeNull()

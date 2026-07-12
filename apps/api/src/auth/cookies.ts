@@ -23,7 +23,11 @@ function serialize(name: string, value: string, flags: CookieFlags): string {
   return parts.join('; ')
 }
 
-export function serializeSessionCookie(name: string, sessionId: string, flags: CookieFlags): string {
+export function serializeSessionCookie(
+  name: string,
+  sessionId: string,
+  flags: CookieFlags,
+): string {
   return serialize(name, sessionId, flags)
 }
 

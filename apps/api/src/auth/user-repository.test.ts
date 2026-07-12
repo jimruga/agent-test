@@ -32,15 +32,30 @@ describe('InMemoryUserRepository', () => {
 
   it('returns the same user (not a new one) for a repeat sign-in with the same subject', async () => {
     const r = repo()
-    const first = await r.findOrCreateFromOAuth({ provider: 'google', subject: 'sub-x', email: 'a@b.co', displayName: 'A B' })
-    const second = await r.findOrCreateFromOAuth({ provider: 'google', subject: 'sub-x', email: 'a@b.co', displayName: 'A B' })
+    const first = await r.findOrCreateFromOAuth({
+      provider: 'google',
+      subject: 'sub-x',
+      email: 'a@b.co',
+      displayName: 'A B',
+    })
+    const second = await r.findOrCreateFromOAuth({
+      provider: 'google',
+      subject: 'sub-x',
+      email: 'a@b.co',
+      displayName: 'A B',
+    })
     expect(second.isNew).toBe(false)
     expect(second.user.id).toBe(first.user.id)
   })
 
   it('getWithMemberships reflects granted memberships and returns null for unknown users', async () => {
     const r = repo()
-    const { user } = await r.findOrCreateFromOAuth({ provider: 'google', subject: 's', email: 'e@x.co', displayName: 'E X' })
+    const { user } = await r.findOrCreateFromOAuth({
+      provider: 'google',
+      subject: 's',
+      email: 'e@x.co',
+      displayName: 'E X',
+    })
     r.addMembership(user.id, { teamId: 'team-1', role: 'owner' })
     const me = await r.getWithMemberships(user.id)
     expect(me?.memberships).toEqual([{ teamId: 'team-1', role: 'owner' }])

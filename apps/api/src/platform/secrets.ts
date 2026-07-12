@@ -9,7 +9,6 @@ export type SecretResolver = (arn: string) => Promise<string>
 
 export const unwiredSecretResolver: SecretResolver = async (arn) => {
   throw new Error(
-    `SecretResolver not wired: cannot resolve ${arn}. ` +
-      'Provide an AWS Secrets Manager resolver (least-privilege IAM) before deploy.',
+    `SecretResolver not wired: cannot resolve ${arn}. Provide an AWS Secrets Manager resolver (least-privilege IAM) before deploy.`,
   )
 }

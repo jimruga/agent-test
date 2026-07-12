@@ -1,4 +1,4 @@
-import { createContext, useContext, type ReactNode } from 'react'
+import { type ReactNode, createContext, useContext } from 'react'
 
 // Web mirror of the server feature-flag decision (TDD §7). The client only
 // REFLECTS the server's decision for rendering — it is NEVER a security control
@@ -13,7 +13,9 @@ export function FeatureFlagProvider({
   enabled: Iterable<string>
   children: ReactNode
 }): ReactNode {
-  return <FeatureFlagContext.Provider value={new Set(enabled)}>{children}</FeatureFlagContext.Provider>
+  return (
+    <FeatureFlagContext.Provider value={new Set(enabled)}>{children}</FeatureFlagContext.Provider>
+  )
 }
 
 export function useFeatureFlag(flag: string): boolean {

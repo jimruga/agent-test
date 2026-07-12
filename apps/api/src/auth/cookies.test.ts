@@ -17,7 +17,11 @@ describe('cookies', () => {
   })
 
   it('omits Secure only when explicitly disabled (local http dev)', () => {
-    const c = serializeSessionCookie('sid', 'v', { secure: false, sameSite: 'Lax', maxAgeSeconds: 60 })
+    const c = serializeSessionCookie('sid', 'v', {
+      secure: false,
+      sameSite: 'Lax',
+      maxAgeSeconds: 60,
+    })
     expect(c).not.toContain('Secure')
     // HttpOnly is NOT optional — it must remain even without Secure.
     expect(c).toContain('HttpOnly')

@@ -1,6 +1,11 @@
 import Fastify from 'fastify'
 import { describe, expect, it } from 'vitest'
-import { errorBody, registerErrorEnvelope, safeErrorLogFields, statusForCode } from './error-envelope'
+import {
+  errorBody,
+  registerErrorEnvelope,
+  safeErrorLogFields,
+  statusForCode,
+} from './error-envelope'
 
 describe('error envelope helpers', () => {
   it('maps codes to the right status', () => {
@@ -11,9 +16,15 @@ describe('error envelope helpers', () => {
   })
 
   it('builds the envelope shape, with details only when provided', () => {
-    expect(errorBody('bad_request', 'nope')).toEqual({ error: { code: 'bad_request', message: 'nope' } })
+    expect(errorBody('bad_request', 'nope')).toEqual({
+      error: { code: 'bad_request', message: 'nope' },
+    })
     expect(errorBody('unprocessable', 'bad', [{ field: 'email', message: 'invalid' }])).toEqual({
-      error: { code: 'unprocessable', message: 'bad', details: [{ field: 'email', message: 'invalid' }] },
+      error: {
+        code: 'unprocessable',
+        message: 'bad',
+        details: [{ field: 'email', message: 'invalid' }],
+      },
     })
   })
 })
@@ -22,18 +33,21 @@ describe('safeErrorLogFields (no PII / no pg detail leaks — sec F2)', () => {
   it('keeps only allowlisted fields and drops pg detail/where/table/column/parameters', () => {
     // Simulate a node-postgres unique-violation error: the PII lives in the
     // driver-populated fields (detail/where), NOT in the generic message.
-    const pgErr = Object.assign(new Error('duplicate key value violates unique constraint "users_email_unique_active"'), {
-      name: 'error',
-      code: '23505',
-      detail: 'Key (email)=(ada@example.com) already exists.',
-      where: 'row for relation "users"',
-      table: 'users',
-      column: 'email',
-      schema: 'public',
-      constraint: 'users_email_unique_active',
-      parameters: ['ada@example.com', 'Ada Lovelace'],
-      routine: '_bt_check_unique',
-    })
+    const pgErr = Object.assign(
+      new Error('duplicate key value violates unique constraint "users_email_unique_active"'),
+      {
+        name: 'error',
+        code: '23505',
+        detail: 'Key (email)=(ada@example.com) already exists.',
+        where: 'row for relation "users"',
+        table: 'users',
+        column: 'email',
+        schema: 'public',
+        constraint: 'users_email_unique_active',
+        parameters: ['ada@example.com', 'Ada Lovelace'],
+        routine: '_bt_check_unique',
+      },
+    )
 
     const fields = safeErrorLogFields(pgErr)
 
@@ -42,7 +56,16 @@ describe('safeErrorLogFields (no PII / no pg detail leaks — sec F2)', () => {
     expect(fields.message).toContain('unique constraint')
 
     // None of the PII-bearing / internal pg fields are serialized.
-    for (const banned of ['detail', 'where', 'table', 'column', 'schema', 'constraint', 'parameters', 'routine']) {
+    for (const banned of [
+      'detail',
+      'where',
+      'table',
+      'column',
+      'schema',
+      'constraint',
+      'parameters',
+      'routine',
+    ]) {
       expect(fields).not.toHaveProperty(banned)
     }
     // Belt and suspenders: the email must not appear anywhere in the record.

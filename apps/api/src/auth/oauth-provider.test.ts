@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createGoogleProvider, type OAuthClaims } from './oauth-provider'
+import { type OAuthClaims, createGoogleProvider } from './oauth-provider'
 
 function fakeResponse(body: unknown, ok = true, status = 200) {
   return { ok, status, json: async () => body } as unknown as Response
@@ -17,7 +17,10 @@ interface CapturedRequest {
   body: string
 }
 
-function recordingFetch(response: Response): { fetchImpl: typeof fetch; requests: CapturedRequest[] } {
+function recordingFetch(response: Response): {
+  fetchImpl: typeof fetch
+  requests: CapturedRequest[]
+} {
   const requests: CapturedRequest[] = []
   const fetchImpl = (async (url: string | URL | Request, init?: RequestInit) => {
     requests.push({ url: String(url), body: init?.body?.toString() ?? '' })
@@ -45,7 +48,9 @@ function makeProvider(fetchImpl: typeof fetch, verify = vi.fn(async () => verifi
 describe('createGoogleProvider.buildAuthorizeUrl', () => {
   it('includes response_type, client_id, S256 challenge, state and nonce', () => {
     const { provider } = makeProvider((async () => fakeResponse({})) as typeof fetch)
-    const url = new URL(provider.buildAuthorizeUrl({ state: 'st', nonce: 'no', codeChallenge: 'chal' }))
+    const url = new URL(
+      provider.buildAuthorizeUrl({ state: 'st', nonce: 'no', codeChallenge: 'chal' }),
+    )
     expect(url.searchParams.get('response_type')).toBe('code')
     expect(url.searchParams.get('client_id')).toBe('client-id')
     expect(url.searchParams.get('code_challenge')).toBe('chal')
@@ -78,7 +83,9 @@ describe('createGoogleProvider.exchangeCode', () => {
 
   it('throws when the token endpoint returns a non-2xx response', async () => {
     const { provider } = makeProvider((async () => fakeResponse({}, false, 401)) as typeof fetch)
-    await expect(provider.exchangeCode({ code: 'c', codeVerifier: 'v' })).rejects.toThrow(/token exchange failed/)
+    await expect(provider.exchangeCode({ code: 'c', codeVerifier: 'v' })).rejects.toThrow(
+      /token exchange failed/,
+    )
   })
 })
 

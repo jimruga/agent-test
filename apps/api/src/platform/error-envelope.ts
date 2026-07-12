@@ -20,7 +20,11 @@ export function statusForCode(code: ApiErrorCode): number {
   return STATUS_BY_CODE[code]
 }
 
-export function errorBody(code: ApiErrorCode, message: string, details?: ApiErrorBody['error']['details']): ApiErrorBody {
+export function errorBody(
+  code: ApiErrorCode,
+  message: string,
+  details?: ApiErrorBody['error']['details'],
+): ApiErrorBody {
   return { error: { code, message, ...(details ? { details } : {}) } }
 }
 
@@ -49,7 +53,10 @@ export function safeErrorLogFields(err: unknown): Record<string, unknown> {
     return { name: 'NonError', type: typeof err }
   }
   const withCode = err as Error & { code?: unknown; statusCode?: unknown }
-  const code = typeof withCode.code === 'string' || typeof withCode.code === 'number' ? withCode.code : undefined
+  const code =
+    typeof withCode.code === 'string' || typeof withCode.code === 'number'
+      ? withCode.code
+      : undefined
   const statusCode = typeof withCode.statusCode === 'number' ? withCode.statusCode : undefined
   return {
     name: err.name,
@@ -68,8 +75,10 @@ export function registerErrorEnvelope(app: FastifyInstance): void {
   app.setNotFoundHandler((_req, reply) => {
     sendError(reply, 'not_found', 'Resource not found')
   })
-  app.setErrorHandler((err, req, reply) => {
-    const status = typeof err.statusCode === 'number' ? err.statusCode : 500
+  // Fastify 5 types the error-handler error as `unknown`, so narrow it defensively
+  // rather than trusting a shape (an error can be any thrown value).
+  app.setErrorHandler((err: unknown, req, reply) => {
+    const status = errorStatusCode(err) ?? 500
     if (status >= 500) {
       // Log the real error server-side, but ONLY the allowlisted safe fields —
       // never the raw `err`, whose pg detail/where/parameters can carry row PII
@@ -78,8 +87,24 @@ export function registerErrorEnvelope(app: FastifyInstance): void {
       sendError(reply, 'internal', 'Something went wrong')
       return
     }
-    sendError(reply, codeForStatus(status), err.message || 'Bad request')
+    sendError(reply, codeForStatus(status), errorMessage(err) || 'Bad request')
   })
+}
+
+/** Read a numeric `statusCode` off an unknown thrown value, if present. */
+function errorStatusCode(err: unknown): number | undefined {
+  if (typeof err === 'object' && err !== null && 'statusCode' in err) {
+    const statusCode = (err as { statusCode?: unknown }).statusCode
+    if (typeof statusCode === 'number') {
+      return statusCode
+    }
+  }
+  return undefined
+}
+
+/** Read a string `message` off an unknown thrown value, if present. */
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : ''
 }
 
 const CODE_BY_STATUS: Record<number, ApiErrorCode> = {

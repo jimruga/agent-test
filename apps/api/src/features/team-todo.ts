@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
-import { TEAM_TODO_MVP } from '../platform/feature-flags'
 import type { AppDeps } from '../deps'
+import { TEAM_TODO_MVP } from '../platform/feature-flags'
 
 // Flag-gated feature registration (S0.3 seam, TDD §7). When `team_todo_mvp` is
 // OFF the feature routes are NOT registered at all — so they 404 and the feature

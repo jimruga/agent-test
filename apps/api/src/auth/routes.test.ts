@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { buildTestApp, type TestApp } from '../testing/build-test-app'
+import { type TestApp, buildTestApp } from '../testing/build-test-app'
 
 const SESSION = 'ttd_session'
 const PRE_AUTH = 'ttd_session_preauth'
 
 /** Drive login → return the pre-auth cookie value and the issued state. */
 async function startLogin(t: TestApp, returnTo = '/app') {
-  const res = await t.app.inject({ method: 'GET', url: `/api/auth/login?returnTo=${encodeURIComponent(returnTo)}` })
+  const res = await t.app.inject({
+    method: 'GET',
+    url: `/api/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+  })
   const preAuth = res.cookies.find((c) => c.name === PRE_AUTH)
   const state = new URL(res.headers.location as string).searchParams.get('state')
   return { res, preAuthValue: preAuth?.value ?? '', state: state ?? '' }
@@ -71,7 +74,10 @@ describe('GET /api/auth/callback', () => {
   it('400s when the pre-auth cookie is absent', async () => {
     const t = buildTestApp()
     const { state } = await startLogin(t)
-    const res = await t.app.inject({ method: 'GET', url: `/api/auth/callback?code=c&state=${state}` })
+    const res = await t.app.inject({
+      method: 'GET',
+      url: `/api/auth/callback?code=c&state=${state}`,
+    })
     expect(res.statusCode).toBe(400)
   })
 
@@ -159,7 +165,11 @@ describe('GET /api/me', () => {
   it('returns the current user after sign-in', async () => {
     const t = buildTestApp()
     const session = await signIn(t)
-    const res = await t.app.inject({ method: 'GET', url: '/api/me', cookies: { [SESSION]: session } })
+    const res = await t.app.inject({
+      method: 'GET',
+      url: '/api/me',
+      cookies: { [SESSION]: session },
+    })
     expect(res.statusCode).toBe(200)
     const body = res.json()
     expect(body.email).toBe('ada@example.com')
@@ -171,7 +181,11 @@ describe('GET /api/me', () => {
     const t = buildTestApp()
     const session = await signIn(t)
     t.advance(13 * 60 * 60 * 1000) // > 12h absolute cap
-    const res = await t.app.inject({ method: 'GET', url: '/api/me', cookies: { [SESSION]: session } })
+    const res = await t.app.inject({
+      method: 'GET',
+      url: '/api/me',
+      cookies: { [SESSION]: session },
+    })
     expect(res.statusCode).toBe(401)
   })
 })
@@ -180,12 +194,20 @@ describe('POST /api/auth/logout', () => {
   it('revokes the session + provider token and is idempotent', async () => {
     const t = buildTestApp()
     const session = await signIn(t)
-    const out = await t.app.inject({ method: 'POST', url: '/api/auth/logout', cookies: { [SESSION]: session } })
+    const out = await t.app.inject({
+      method: 'POST',
+      url: '/api/auth/logout',
+      cookies: { [SESSION]: session },
+    })
     expect(out.statusCode).toBe(204)
     expect(t.oauth.revoked).toContain('refresh-tok')
 
     // Session no longer valid.
-    const me = await t.app.inject({ method: 'GET', url: '/api/me', cookies: { [SESSION]: session } })
+    const me = await t.app.inject({
+      method: 'GET',
+      url: '/api/me',
+      cookies: { [SESSION]: session },
+    })
     expect(me.statusCode).toBe(401)
 
     // Idempotent: logging out again with no session still 204s.

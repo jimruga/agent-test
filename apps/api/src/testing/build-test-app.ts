@@ -36,9 +36,17 @@ export class FakeOAuthProvider implements OAuthProvider {
 
   async exchangeCode(_params: ExchangeCodeParams): Promise<OAuthResult> {
     if (this.exchangeShouldFail) throw new Error('exchange failed')
-    const nonce = this.overrideNonce !== undefined ? this.overrideNonce ?? undefined : this.lastAuthorize?.nonce
+    const nonce =
+      this.overrideNonce !== undefined
+        ? (this.overrideNonce ?? undefined)
+        : this.lastAuthorize?.nonce
     return {
-      tokens: { accessToken: 'access-tok', refreshToken: 'refresh-tok', idToken: 'id-tok', expiresInSeconds: 3600 },
+      tokens: {
+        accessToken: 'access-tok',
+        refreshToken: 'refresh-tok',
+        idToken: 'id-tok',
+        expiresInSeconds: 3600,
+      },
       claims: { ...this.claims, nonce },
     }
   }
@@ -80,5 +88,13 @@ export function buildTestApp(options: { flagsOn?: string[] } = {}): TestApp {
     userRepository,
     now,
   }
-  return { app: buildApp(deps), deps, oauth, userRepository, advance: (ms: number) => { clock += ms } }
+  return {
+    app: buildApp(deps),
+    deps,
+    oauth,
+    userRepository,
+    advance: (ms: number) => {
+      clock += ms
+    },
+  }
 }

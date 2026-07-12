@@ -1,6 +1,11 @@
 import type { CurrentUser, MembershipSummary, TeamRole } from '@repo/shared'
 import type { Knex } from 'knex'
-import { deriveInitials, type OAuthUpsert, type UserRecord, type UserRepository } from './user-repository'
+import {
+  type OAuthUpsert,
+  type UserRecord,
+  type UserRepository,
+  deriveInitials,
+} from './user-repository'
 
 // Production persistence adapter (schema: TDD §3 users / oauth_identities /
 // memberships). The DDL is authored by the DATA-ENGINEER as Knex migrations into
@@ -63,7 +68,9 @@ export class KnexUserRepository implements UserRepository {
   async getWithMemberships(userId: string): Promise<CurrentUser | null> {
     const user = await this.knex('users').where({ id: userId, status: 'active' }).first<UserRow>()
     if (!user) return null
-    const rows = await this.knex('memberships').where({ user_id: userId }).select<MembershipRow[]>('team_id', 'role')
+    const rows = await this.knex('memberships')
+      .where({ user_id: userId })
+      .select<MembershipRow[]>('team_id', 'role')
     const memberships: MembershipSummary[] = rows.map((r) => ({ teamId: r.team_id, role: r.role }))
     return {
       id: user.id,

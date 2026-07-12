@@ -1,8 +1,8 @@
 import Fastify, { type FastifyInstance } from 'fastify'
 import { registerAuthRoutes } from './auth/routes'
+import type { AppDeps } from './deps'
 import { registerTeamTodoFeature } from './features/team-todo'
 import { registerErrorEnvelope } from './platform/error-envelope'
-import type { AppDeps } from './deps'
 
 // The Fastify app instance is BUILT here and SERVED separately (index.ts), so
 // tests exercise it in-process via `app.inject({ method, url })` — no network or
