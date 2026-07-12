@@ -14,7 +14,7 @@
     "migrate:down": "NODE_OPTIONS=\"--import tsx\" knex migrate:rollback --all --knexfile knexfile.ts"
   },
   "dependencies": {
-    "@hey-api/openapi-ts": "0.53.12",
+    "@hey-api/openapi-ts": "^0.99.0",
     "@repo/shared": "*",
     "fastify": "^5.10.0",
     "ioredis": "~5.4.0",

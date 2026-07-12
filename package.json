@@ -4,7 +4,8 @@
   "private": true,
   "description": "Team To-Do App (MVP) — monorepo root. First service on the platform.",
   "engines": {
-    "node": ">=20"
+    "node": ">=20 <21",
+    "npm": ">=10 <11"
   },
   "workspaces": [
     "apps/*",
@@ -27,8 +28,9 @@
     "vitest": "^4.1.10"
   },
   "dependencies": {
-    "@hey-api/openapi-ts": "0.53.12",
+    "@hey-api/openapi-ts": "^0.99.0",
     "fastify": "5.10.0",
+    "nvm": "^0.0.4",
     "vite": "8.1.4"
   },
   "allowScripts": {}

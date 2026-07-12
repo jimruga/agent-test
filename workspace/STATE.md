@@ -10,7 +10,9 @@
 - **Human steps (iter 5):** rm package-lock.json && npm install (openapi-ts 0.99→0.53.12); chmod +x verify.sh (edit reset it); git add -A; confirm verify.sh=100755; commit; push → CI all-green → compliance attest → Gate 5.
 - **Control changes (audit #3, #4):** verify.sh tamper-check regex anchored + scoped to test-file diffs (human-approved).
 - **Follow-ups (non-blocking):** openapi-ts config API reconcile at first gen:client; dependency-hygiene cleanup (@hey-api runtime-dep + fastify/vite misplacements).
-- **CI-greening loop count: 5** (each iter distinct real issue: exec bit→missing lock→stale lock+regex FP→typecheck/biome-scope→ ; convergent; loop-guard: no thrash).
+- **Tamper check now PASSES** (control fix worked). Remaining real fail = install only (lockfile out of sync: missing magicast@0.3.5); typecheck/lint/test cascade from it.
+- **ROOT CAUSE (recurring lock blocker, 3x): lock generated on Node 26 vs CI Node 20 → transitive-dep resolution mismatch.** FIX: regen lock under Node 20 + run `npm ci` & `./verify.sh` LOCALLY on Node 20 to prove green before push. Recommend .nvmrc/engines pin.
+- **CI-greening loop count: 5** (distinct issues; loop-guard no thrash, but lock-sync sub-issue recurring → escalated root cause to human).
 - **Reviews done + fixes applied:** security + code review returned; all must-fix items resolved & staged on feature/s0-s1-foundation-auth (C1 gitignore, W2 knex TS loader, F1/W3 nonce fail-closed, F2 PII-safe logs, W4 repo integration lane in all-green, + timingSafeEqual, CLAUDE.md versions). Not executed (no registry/node in sandbox) — CI is the verifier.
 - **BLOCKED ON HUMAN:** commit branch + `npm install` (lockfile) + push + open PR → CI all-green (now incl. integration lane) → then pm runs compliance attestation → request Gate 5.
 - **Deploy-time (Gate 6) queue:** JWKS real verify (eng), Secrets Manager IAM + Redis private/TLS/KMS + RDS/KMS + app_runtime role + rate limiting + edge headers (devops).
