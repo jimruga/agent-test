@@ -9,7 +9,14 @@
 *.keystore
 id_rsa*
 *.crt           # exclude certs from VCS; reference from Secrets Manager / ACM
-secrets.*
+# Credential FILES only — must NOT match source modules like `secrets.ts`
+# (see apps/api/src/platform/secrets.ts). Narrowed from the old `secrets.*`
+# blanket, which silently ignored source + broke CI typecheck (code-review C1).
+secrets.json
+secrets.yaml
+secrets.yml
+*.secrets.*
+.secrets/
 credentials
 credentials.*
 .aws/
@@ -54,3 +61,4 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+.claude/settings.local.json

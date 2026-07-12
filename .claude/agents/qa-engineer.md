@@ -3,9 +3,9 @@ name: qa-engineer
 description: Quality engineer. Use after implementation to automate testing and find defects across unit, isolation, and frontend UI layers. Files bugs in Jira and routes them to the software engineer. Owns the test suite; does not fix application code.
 model: sonnet
 mcpServers:
-  - github
-  - jira
-  - slack
+  - GitHub
+  - Jira
+  - Slack
 skills:
   - test-data
   - legacy-refactoring

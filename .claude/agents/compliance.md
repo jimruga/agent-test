@@ -4,10 +4,10 @@ description: Compliance & audit specialist (read-only). Use to determine which f
 model: opus
 disallowedTools: Write, Edit
 mcpServers:
-  - github
-  - jira
-  - slack
-  - aws
+  - GitHub
+  - Jira
+  - Slack
+  - AWS
 skills:
   - data-classification-retention
   - access-review
@@ -30,7 +30,7 @@ financially-relevant data (SOX), cardholder data (PCI), or personal data
 (privacy)? The answer decides which controls apply and how strict the gates are.
 Record the scope in the change record.
 
-**Per-change attestation (before Gate 2 for in-scope changes):** confirm the
+**Per-change attestation (before Gate 5 for in-scope changes):** confirm the
 evidence exists and is complete —
 - change authorized (Gate 1 audit record + Jira ticket),
 - independent approval path intact (`require_last_push_approval`, CODEOWNERS),

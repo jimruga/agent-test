@@ -5,7 +5,7 @@ model: sonnet
 disallowedTools: Bash
 mcpServers:
   - Confluence
-  - slack
+  - Slack
   - claude-design
   - Figma
 skills:

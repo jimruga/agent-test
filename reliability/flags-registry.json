@@ -11,6 +11,17 @@
       "created": "2026-06-01",
       "expiry": "2026-08-01",
       "notes": "Ramp 1->10->50->100 watching alert-delivery SLO; kill switch disables dispatch."
+    },
+    {
+      "name": "team_todo_mvp",
+      "type": "release",
+      "owner": "software-engineer",
+      "default": false,
+      "rollout": "0%",
+      "kill_switch": true,
+      "created": "2026-07-11",
+      "expiry": "2026-10-01",
+      "notes": "Single flag gating the Team To-Do MVP (TDD §7). Server-evaluated; when OFF the API feature routes are NOT registered (404 dark) and the web feature barrel/route tier is unmounted. /api/auth/* and /api/me register independently so a canary cohort can sign in. Kill switch = flip OFF to remove routes+UI without a deploy. Ramp canary->1->10->50->100 watching p95 task-list-load + error-rate SLIs. Remove once 100% stable."
     }
   ]
 }

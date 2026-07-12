@@ -1,0 +1,119 @@
+openapi: 3.1.0
+info:
+  title: Team To-Do App API
+  version: 0.1.0
+  description: >
+    Contract-first source of truth. The web client under apps/web/src/client/ is
+    GENERATED from this file (`make claude-gen-client`) and never hand-edited.
+    Operational endpoints (e.g. /ping) are intentionally NOT part of the contract.
+    All auth is OAuth2 authorization-code + PKCE; tokens are held server-side only
+    and never returned to the SPA — the browser holds only an opaque session cookie.
+servers:
+  - url: /api
+    description: All paths are relative to the /api base path.
+tags:
+  - name: auth
+    description: OAuth2 sign-in, session, and the current-user profile.
+paths:
+  /auth/login:
+    get:
+      operationId: authLogin
+      tags: [auth]
+      summary: Begin the OAuth2 authorization-code + PKCE flow.
+      description: >
+        Browser-navigation endpoint (not fetched by the generated client). The
+        server generates state, nonce, and a PKCE verifier, stashes them in a
+        short-lived pre-auth session, and 302-redirects to the identity provider.
+      parameters:
+        - { name: provider, in: query, required: false, schema: { type: string, enum: [google] } }
+        - { name: returnTo, in: query, required: false, schema: { type: string } }
+      responses:
+        '302': { description: Redirect to the identity provider's authorize endpoint. }
+        '400':
+          description: Unknown provider or disallowed returnTo.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+  /auth/callback:
+    get:
+      operationId: authCallback
+      tags: [auth]
+      summary: OAuth2 redirect target — exchanges the code server-side.
+      description: >
+        Browser-navigation endpoint. Validates state, exchanges the code for tokens
+        server-side (tokens never reach the client), validates the ID token, creates
+        a server-side session, sets the opaque session cookie, and 302-redirects to
+        the validated returnTo.
+      parameters:
+        - { name: code, in: query, required: true, schema: { type: string } }
+        - { name: state, in: query, required: true, schema: { type: string } }
+      responses:
+        '302': { description: Session established; redirect to the app. }
+        '400':
+          description: Missing/invalid state or code; CSRF or replay rejected.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+  /auth/logout:
+    post:
+      operationId: authLogout
+      tags: [auth]
+      summary: Revoke the current session.
+      description: Deletes the server-side session, revokes provider tokens, clears the cookie.
+      responses:
+        '204': { description: Logged out (idempotent — 204 even with no active session). }
+  /me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: The authenticated user's profile and team memberships.
+      responses:
+        '200':
+          description: Current user.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CurrentUser' }
+        '401':
+          description: No valid session.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+components:
+  schemas:
+    ApiError:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [bad_request, unauthenticated, forbidden, not_found, conflict, unprocessable, rate_limited, internal]
+            message: { type: string }
+            details:
+              type: array
+              items:
+                type: object
+                additionalProperties: false
+                required: [message]
+                properties:
+                  field: { type: string }
+                  message: { type: string }
+    MembershipSummary:
+      type: object
+      additionalProperties: false
+      required: [teamId, role]
+      properties:
+        teamId: { type: string, format: uuid }
+        role: { type: string, enum: [owner, member] }
+    CurrentUser:
+      type: object
+      additionalProperties: false
+      required: [id, displayName, email, avatarInitials, memberships]
+      properties:
+        id: { type: string, format: uuid }
+        displayName: { type: string }
+        email: { type: string, format: email }
+        avatarInitials:
+          type: [string, 'null']
+        memberships:
+          type: array
+          items: { $ref: '#/components/schemas/MembershipSummary' }

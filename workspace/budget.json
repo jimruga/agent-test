@@ -1,13 +1,25 @@
 {
-  "feature": "<feature name>",
-  "allocated_tokens": 0,
+  "feature": "Collaborative multi-user to-do list (MVP)",
+  "allocated_tokens": 6000000,
   "used_tokens": 0,
-  "hard_cap_tokens": 0,
+  "hard_cap_tokens": 7000000,
   "thresholds_alerted": [],
-  "aws_estimate_monthly_usd": {
-    "staging": 0,
-    "production": 0,
-    "approved_total": 0
+  "budget_history": [
+    {"date": "2026-07-09", "allocated": 4000000, "hard_cap": 5500000, "note": "Gate 1 initial (human:Jim)"},
+    {"date": "2026-07-09", "allocated": 6000000, "hard_cap": 7000000, "note": "Gate 3 token-overage raise (human:Jim): build forecast 5.6-6.7M > prior 4M/5.5M; compliance-mandated drivers not cuttable"}
+  ],
+  "clocktime": {
+    "estimate_hours": {"optimistic": 175, "expected": 275, "pessimistic": 455},
+    "elapsed_hours": null,
+    "note": "Engineer-hours for S0-S11 (software-engineer estimate at S0/S1 kickoff). Highest variance: S2 tenancy, S9 erasure. ~4.5/7/11.5 engineer-weeks solo. Spend agent to track elapsed vs this baseline."
   },
-  "notes": "PM sets allocated_tokens + hard_cap_tokens from the PRD at Gate 1. The hook updates used_tokens and thresholds_alerted automatically. hard_cap_tokens is the point at which new subagent dispatch is blocked until a human raises it."
+  "enforcement_note": "budget-threshold hook not recording used_tokens in this environment (auto hard-cap enforcement inactive). Interim control: manual monitoring via spend agent. Fix before implementation heavy-build phase.",
+  "aws_estimate_monthly_usd": {
+    "staging": 120,
+    "production": 210,
+    "approved_total": 365,
+    "estimate_total": 330,
+    "estimate_note": "approved_total is null pending human approval at Gate 1 (PRD Review). Combined AWS runtime estimate is $330/mo (staging $120 + production $210). Recommend approving with a ~10% buffer = $365/mo to absorb data-transfer/usage variance. Region us-east-1, priced 2026-07, on-demand. Excludes third-party SaaS monitoring (Datadog/Sentry/Logz.io/Heap), which is billed outside AWS."
+  },
+  "notes": "PM sets allocated_tokens + hard_cap_tokens from the PRD at Gate 1. The hook updates used_tokens and thresholds_alerted automatically. hard_cap_tokens is the point at which new subagent dispatch is blocked until a human raises it. AWS runtime estimate set by devops-engineer; final estimated cost and any overage require human approval."
 }

@@ -36,17 +36,19 @@ tamper_check() {
   else echo "   ok"; fi
 }
 
-# ── JavaScript / React areas (ux, api, application) ───────────────────────
-for dir in ux api application; do
-  [ -f "$dir/package.json" ] || continue
-  echo "## $dir (node)"
-  if [ "$MODE" = "full" ]; then ( cd "$dir" && run "$dir: install" npm ci --no-audit --no-fund ); fi
-  if [ "$MODE" = "full" ] || [ -d "$dir/node_modules" ]; then
-    ( cd "$dir" && npm run 2>/dev/null | grep -q ' lint'      ) && ( cd "$dir" && run "$dir: lint"      npm run lint )
-    ( cd "$dir" && npm run 2>/dev/null | grep -q ' typecheck' ) && ( cd "$dir" && run "$dir: typecheck" npm run typecheck )
+# ── JavaScript / TypeScript monorepo (npm workspaces: apps/*, packages/*) ──────
+# The root package.json defines the workspaces and the aggregate scripts
+# (typecheck/lint/test). Coverage thresholds are enforced by the test runner
+# itself (vitest coverage.thresholds), so a passing `npm test` is a covered run.
+if [ -f package.json ] && grep -q '"workspaces"' package.json; then
+  echo "## monorepo (node / npm workspaces)"
+  if [ "$MODE" = "full" ]; then run "install" npm ci --no-audit --no-fund; fi
+  if [ "$MODE" = "full" ] || [ -d node_modules ]; then
+    run "typecheck" npm run typecheck
+    run "lint" npm run lint
   else echo "   (fast mode, deps not installed — lint/typecheck deferred to CI)"; fi
-  if [ "$MODE" = "full" ]; then ( cd "$dir" && run "$dir: test+coverage" npm test -- --coverage --watchAll=false ); fi
-done
+  if [ "$MODE" = "full" ]; then run "test+coverage" npm test; fi
+fi
 
 # ── Python areas (Lambdas / services) ─────────────────────────────────────
 if ls **/pyproject.toml requirements*.txt >/dev/null 2>&1; then

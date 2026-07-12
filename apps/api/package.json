@@ -1,0 +1,32 @@
+{
+  "name": "@repo/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "migrate:up": "NODE_OPTIONS=\"--import tsx\" knex migrate:latest --knexfile knexfile.ts",
+    "migrate:down": "NODE_OPTIONS=\"--import tsx\" knex migrate:rollback --all --knexfile knexfile.ts"
+  },
+  "dependencies": {
+    "@repo/shared": "*",
+    "fastify": "~5.1.0",
+    "ioredis": "~5.4.0",
+    "knex": "~3.1.0",
+    "pg": "~8.13.0",
+    "uuidv7": "~1.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "~20.16.0",
+    "@types/pg": "~8.11.0",
+    "tsx": "~4.19.0",
+    "typescript": "~5.6.0",
+    "vitest": "~2.1.0",
+    "@vitest/coverage-v8": "~2.1.0"
+  }
+}
