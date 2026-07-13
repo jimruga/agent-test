@@ -33,6 +33,11 @@ jobs:
         with: { fetch-depth: 0 }          # full history so the tamper diff has a base
       - uses: actions/setup-node@v4
         with: { node-version: "20" }
+      # Pin npm to the SAME resolver the lockfile was generated with
+      # (root package.json "packageManager"). Generating and consuming the lock
+      # with one npm version is what stops the darwin/linux drift (npm/cli#4828).
+      - name: Pin npm (match packageManager)
+        run: npm i -g npm@10.9.3 && npm --version
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - name: Resolve diff base
@@ -69,6 +74,9 @@ jobs:
       - uses: actions/setup-node@v4
         if: steps.gate.outputs.run == 'true'
         with: { node-version: "20" }
+      - name: Pin npm (match packageManager)
+        if: steps.gate.outputs.run == 'true'
+        run: npm i -g npm@10.9.3 && npm --version
       - name: Apply then roll back (Knex; migrations owned by data-engineer)
         if: steps.gate.outputs.run == 'true'
         run: |
@@ -101,6 +109,9 @@ jobs:
       - uses: actions/setup-node@v4
         if: steps.gate.outputs.run == 'true'
         with: { node-version: "20" }
+      - name: Pin npm (match packageManager)
+        if: steps.gate.outputs.run == 'true'
+        run: npm i -g npm@10.9.3 && npm --version
       # Apply the real schema, then exercise the production repository adapters
       # (KnexUserRepository, ...) against it — the code the no-DB unit lane can't
       # cover (review W4). Proves the SQL, not just the in-memory fake.
@@ -119,6 +130,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: "20" }
+      - name: Pin npm (match packageManager)
+        run: npm i -g npm@10.9.3 && npm --version
       - name: npm audit (fail on high/critical)
         run: |
           # Single lockfile at the workspace root (apps/*, packages/*).
@@ -139,9 +152,43 @@ jobs:
         run: |
           echo "TODO generate + upload SBOM (anchore/sbom-action or cyclonedx-cli)"
 
+  lockfile-guard:
+    name: Lockfile cross-platform guard
+    runs-on: ubuntu-latest
+    # Turns the "works on my Mac" lockfile bug (npm/cli#4828) into a fast, clear,
+    # BINDING failure instead of a cryptic `npm ci` "missing X from lock" cascade.
+    # A lock generated on darwin can omit the linux-x64 native optional deps that
+    # the linux CI runners need; this job asserts they are present before merge.
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert the committed lock contains the linux-x64 native deps CI needs
+        run: |
+          set -euo pipefail
+          f=package-lock.json
+          [ -f "$f" ] || { echo "::error::no root package-lock.json committed"; exit 1; }
+          rc=0
+          # Native optional deps that MUST be present for the linux-x64 CI runners.
+          # (Pinned toolchain: biome 1.9.4 ships per-platform CLI binaries.)
+          for pkg in "@biomejs/cli-linux-x64"; do
+            if ! grep -q "\"node_modules/$pkg\"" "$f"; then
+              echo "::error::package-lock.json is MISSING $pkg (linux-x64 native binary)."
+              echo "::error::This lock was generated on a non-linux host (npm/cli#4828). Regenerate it on linux (docker run node:20 ...) per the CI toolchain runbook (workspace/ci-toolchain-fix.md), then recommit."
+              rc=1
+            fi
+          done
+          # Regression guard: vite 8 pulls rolldown's per-platform native bindings,
+          # which is exactly what re-introduces the cross-platform lock breakage.
+          # The pinned toolchain is vite 5.4 (esbuild/rollup, no rolldown).
+          if grep -q '@rolldown/binding' "$f"; then
+            echo "::error::package-lock.json contains @rolldown/binding — vite 8 crept back in. The pinned toolchain is vite 5.4.x (no rolldown). Do NOT upgrade vite past 5.x without re-solving the cross-platform lockfile."
+            rc=1
+          fi
+          if [ "$rc" = 0 ]; then echo "Lockfile cross-platform guard: OK (linux-x64 native deps present, no rolldown)"; fi
+          exit $rc
+
   all-green:
     name: all-green
-    needs: [secret-scan, verify, migrations, integration, sca]
+    needs: [secret-scan, verify, migrations, integration, sca, lockfile-guard]
     runs-on: ubuntu-latest
     steps:
       - run: echo "All required checks passed."
