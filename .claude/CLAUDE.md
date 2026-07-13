@@ -13,7 +13,7 @@ inspect an existing feature folder before creating a new pattern.
 
 ---
 ## Stack (one-line orientation)
-Node.js >=20, npm ~10, Typescript ~5.6, React ~19.0, Fastify ~5.1, Knex ~3.1
+Node.js ~26, npm ~12, Typescript ~7, React ~19, Fastify ~5.10, Knex ~3.3
 <!-- Versions reconciled to what is actually installable/installed today per
 ADR-0004 (the earlier TS ~7.0.2 / Node ~26.5.0 / Fastify ~5.10 / Knex ~3.3 pins
 were aspirational and unresolvable — code-review S3). Bump here AND in the

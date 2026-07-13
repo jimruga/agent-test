@@ -72,3 +72,4 @@ tamper_check
 echo
 if [ "$fails" -eq 0 ]; then echo "VERIFY: PASS (mode=$MODE)"; exit 0
 else echo "VERIFY: FAIL — $fails check(s) failed (mode=$MODE)"; exit 1; fi
+
