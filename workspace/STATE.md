@@ -5,16 +5,18 @@
 - **Active feature:** Team To-Do App (MVP) — collaborative multi-user task management
 - **Lifecycle phase:** architecture / technical design (Gate 2 APPROVED; working toward Gate 3 Tdd)
 - **Lifecycle phase:** implementation (Gate 4 APPROVED; building S0+S1 test-driven, behind flag)
-- **Current owner (agent):** HUMAN (commit for CI iter 5). Gate 5 NOT requested.
-- **All CI failures fixed; engineer verified local gate GREEN on Node 26 (typecheck/lint/65 tests).** CI on Node 20 is the binding check.
-- **Human steps (iter 5):** rm package-lock.json && npm install (openapi-ts 0.99→0.53.12); chmod +x verify.sh (edit reset it); git add -A; confirm verify.sh=100755; commit; push → CI all-green → compliance attest → Gate 5.
+- **Current owner (agent):** HUMAN (commit for CI iter 9 — Node26/npm12 upgrade + lockfile regen). Gate 5 NOT requested.
+- **TOOLCHAIN UPGRADE DONE (Node ~26 / npm ~12):** engineer applied Node26/npm12 upgrade per ADR-0005. All CI failures from previous iterations fixed. Lockfile must be regenerated on linux with npm@12.0.1 (same 4-step no-Docker path, updated version strings). CI on Node 26 is the binding check.
+- **Human steps (iter 9, NO DOCKER):** (1) commit+push Node26/npm12 changes (package.json, .nvmrc, apps/api/package.json, ci.yml, regen-lockfile.yml, ADR-0005) — CI red expected (no lock yet); (2) Actions → run `regen-lockfile` on branch; (3) download artifact `package-lock-linux`; (4) unzip lock → commit → push → CI all-green. Full click-path in ci-toolchain-fix.md.
 - **Control changes (audit #3, #4):** verify.sh tamper-check regex anchored + scoped to test-file diffs (human-approved).
 - **Follow-ups (non-blocking):** openapi-ts config API reconcile at first gen:client; dependency-hygiene cleanup (@hey-api runtime-dep + fastify/vite misplacements).
 - **REGRESSION:** all 3 manifests reverted to vite8/vitest4/openapi0.99 experiment + bogus `nvm@0.0.4` installed. CI(linux) fails on missing biome/rolldown linux native bindings (npm cross-platform optional-deps bug; vite8→rolldown). tamper+typecheck now pass.
 - **Definitive fix DONE (engineer):** revert cause = stray `npm install nvm` mutated manifests, committed via 76a32a6 "sync lockfile" (NOT a git op — reflog clean). Restored 4 files (manifests + openapi-ts.config); removed nvm/allowScripts/misplaced deps; pinned vite5.4.21/vitest2.1.9/openapi-ts0.53.12-web-devDep. verify.sh untouched. No app logic changed.
 - **Prevention:** lock-sync commits must show ZERO manifest diff; never casual `npm install <pkg>`; `nvm use` is a shell cmd.
-- **Human steps (iter 7):** npm uninstall nvm → Node20 rm lock+install → rm node_modules+npm ci+./verify.sh green → diff-check → commit 4 files+lock → push. CI(linux) = binding.
-- **CI-greening loops: ~7 (all env/tooling, NOT feature defects; auth suite 65 tests/96% cov + tamper + typecheck green).** loop-guard: no agent thrash.
+- **Current owner (agent):** HUMAN (regen lock on linux + push, per workspace/ci-toolchain-fix.md).
+- **DURABLE CI fix DONE (devops):** Pinned npm@10.9.3 (iter 8), lockfile-guard + regen-lockfile.yml in place. npm/cli#4828 still unresolved in npm 12 → lockfile-guard + regen workflow retained.
+- **TOOLCHAIN UPGRADE (Node 26 / npm 12):** engineer applied on 2026-07-13 (ADR-0005). package.json engines/packageManager, .nvmrc, apps/api @types/node, ci.yml (4 jobs), regen-lockfile.yml all updated to Node26/npm@12.0.1. No app logic changed. PM decision: Node 26 pre-LTS accepted for dev/CI; Gate 6 deploy plan MUST confirm Active-LTS (2026-10-28) before production.
+- **CI-greening loops: ~8 (all env/tooling, NOT feature defects; auth 65 tests/96% cov + tamper + typecheck green).** loop-guard: no agent thrash.
 - **Reviews done + fixes applied:** security + code review returned; all must-fix items resolved & staged on feature/s0-s1-foundation-auth (C1 gitignore, W2 knex TS loader, F1/W3 nonce fail-closed, F2 PII-safe logs, W4 repo integration lane in all-green, + timingSafeEqual, CLAUDE.md versions). Not executed (no registry/node in sandbox) — CI is the verifier.
 - **BLOCKED ON HUMAN:** commit branch + `npm install` (lockfile) + push + open PR → CI all-green (now incl. integration lane) → then pm runs compliance attestation → request Gate 5.
 - **Deploy-time (Gate 6) queue:** JWKS real verify (eng), Secrets Manager IAM + Redis private/TLS/KMS + RDS/KMS + app_runtime role + rate limiting + edge headers (devops).

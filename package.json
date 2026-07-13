@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "description": "Team To-Do App (MVP) — monorepo root. First service on the platform.",
-  "packageManager": "npm@10.9.3",
+  "packageManager": "npm@12.0.1",
   "engines": {
-    "node": ">=20 <21",
-    "npm": ">=10 <11"
+    "node": ">=26 <27",
+    "npm": ">=12 <13"
   },
   "workspaces": [
     "apps/*",

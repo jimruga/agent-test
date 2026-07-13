@@ -32,12 +32,12 @@ jobs:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }          # full history so the tamper diff has a base
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        with: { node-version: "26" }
       # Pin npm to the SAME resolver the lockfile was generated with
       # (root package.json "packageManager"). Generating and consuming the lock
       # with one npm version is what stops the darwin/linux drift (npm/cli#4828).
       - name: Pin npm (match packageManager)
-        run: npm i -g npm@10.9.3 && npm --version
+        run: npm i -g npm@12.0.1 && npm --version
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - name: Resolve diff base
@@ -73,10 +73,10 @@ jobs:
       # (e.g. npm run migrate:up / migrate:down, alembic upgrade/downgrade, sqitch).
       - uses: actions/setup-node@v4
         if: steps.gate.outputs.run == 'true'
-        with: { node-version: "20" }
+        with: { node-version: "26" }
       - name: Pin npm (match packageManager)
         if: steps.gate.outputs.run == 'true'
-        run: npm i -g npm@10.9.3 && npm --version
+        run: npm i -g npm@12.0.1 && npm --version
       - name: Apply then roll back (Knex; migrations owned by data-engineer)
         if: steps.gate.outputs.run == 'true'
         run: |
@@ -108,10 +108,10 @@ jobs:
           else echo "run=false" >> "$GITHUB_OUTPUT"; echo "No migrations/ — no relational integration lane."; fi
       - uses: actions/setup-node@v4
         if: steps.gate.outputs.run == 'true'
-        with: { node-version: "20" }
+        with: { node-version: "26" }
       - name: Pin npm (match packageManager)
         if: steps.gate.outputs.run == 'true'
-        run: npm i -g npm@10.9.3 && npm --version
+        run: npm i -g npm@12.0.1 && npm --version
       # Apply the real schema, then exercise the production repository adapters
       # (KnexUserRepository, ...) against it — the code the no-DB unit lane can't
       # cover (review W4). Proves the SQL, not just the in-memory fake.
@@ -129,9 +129,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        with: { node-version: "26" }
       - name: Pin npm (match packageManager)
-        run: npm i -g npm@10.9.3 && npm --version
+        run: npm i -g npm@12.0.1 && npm --version
       - name: npm audit (fail on high/critical)
         run: |
           # Single lockfile at the workspace root (apps/*, packages/*).
@@ -172,7 +172,7 @@ jobs:
           for pkg in "@biomejs/cli-linux-x64"; do
             if ! grep -q "\"node_modules/$pkg\"" "$f"; then
               echo "::error::package-lock.json is MISSING $pkg (linux-x64 native binary)."
-              echo "::error::This lock was generated on a non-linux host (npm/cli#4828). Regenerate it on linux (docker run node:20 ...) per the CI toolchain runbook (workspace/ci-toolchain-fix.md), then recommit."
+              echo "::error::This lock was generated on a non-linux host (npm/cli#4828). Regenerate it on linux (docker run node:26 ...) per the CI toolchain runbook (workspace/ci-toolchain-fix.md), then recommit."
               rc=1
             fi
           done

@@ -17,7 +17,7 @@ on:
       ref:
         description: "Branch to regenerate the lock on"
         required: true
-        default: "feature/s0-s1-foundation-auth"
+        default: "main"
 
 permissions:
   contents: read
@@ -31,10 +31,10 @@ jobs:
         with:
           ref: ${{ github.event.inputs.ref }}
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        with: { node-version: "26" }
       # Same pinned resolver as CI + the packageManager field — identical everywhere.
       - name: Pin npm (match packageManager)
-        run: npm i -g npm@10.9.3 && npm --version
+        run: npm i -g npm@12.0.1 && npm --version
       - name: Regenerate the lockfile from the committed manifests (linux-x64)
         run: |
           set -euo pipefail
