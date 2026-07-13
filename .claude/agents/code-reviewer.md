@@ -1,12 +1,12 @@
 ---
 name: code-reviewer
-description: Code review specialist. Use after QA passes and before merge. Reviews code AND any accompanying DB migration together for quality, maintainability, error handling, security basics, and test coverage. Read-only — requests changes and routes them to the right owner; does not edit. Final approval is a human gate (Gate 2).
+description: Code review specialist. Use after QA passes and before merge. Reviews code AND any accompanying DB migration together for quality, maintainability, error handling, security basics, and test coverage. Read-only — requests changes and routes them to the right owner; does not edit. Final approval is a human gate (Gate 5).
 model: opus
 disallowedTools: Write, Edit
 mcpServers:
-  - github
-  - jira
-  - slack
+  - GitHub
+  - Jira
+  - Slack
 skills:
   - software-design-patterns
 memory: project
@@ -50,6 +50,6 @@ NEXT: route to data-engineer — migration changes requested: <detail> | gate: n
 ```
 NEXT: route to pm — code + migration review clean, recommend approval | gate: human:final-code-approval
 ```
-The PM posts to Slack for **Gate 2** human approval before any merge/deploy.
-Your recommendation is not the authorization: a **human** approves at Gate 2,
+The PM posts to Slack for **Gate 5** human approval before any merge/deploy.
+Your recommendation is not the authorization: a **human** approves at Gate 5,
 independent of the author (`require_last_push_approval`). You assess; you don't approve.

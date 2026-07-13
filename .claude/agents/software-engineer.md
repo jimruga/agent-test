@@ -3,10 +3,10 @@ name: software-engineer
 description: Backend/full-stack software engineer. Use to design architecture and implement application logic, APIs, and data access after the PRD is approved. Owns maintainability and application architecture. Practices TDD. Receives all defect, code-review, application-security, and infra-cost feedback. Does not own AWS infrastructure (devops), the React UI (frontend), or DB migrations (data-engineer).
 model: opus
 mcpServers:
-  - github
-  - jira
-  - confluence
-  - slack
+  - GitHub
+  - Jira
+  - Confluence
+  - Slack
 skills:
   - tdd
   - implement

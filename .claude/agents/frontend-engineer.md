@@ -3,10 +3,10 @@ name: frontend-engineer
 description: Frontend engineer. Use to build the ReactJS user interface to pixel-perfect match the designer's mocks — secure, responsive, cross-browser and mobile. Consumes the API contract from the software engineer. Does not design UX or write backend logic.
 model: sonnet
 mcpServers:
-  - github
-  - jira
+  - GitHub
+  - Jira
   - Confluence
-  - slack
+  - Slack
 skills:
   - accessibility-wcag
   - tdd-workflow

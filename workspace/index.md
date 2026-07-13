@@ -6,7 +6,7 @@
 ## Confluence
 - PRD (incl. token + AWS cost estimates): <url>
 - Implementation plans / ADRs: <url>
-- UX mocks: <url>
+- UX mocks: https://claude.ai/code/artifact/94f3e816-ebe7-4f14-bdae-f50a1fc9ea03 (wireframes, tokens, states, a11y notes; companion detail: workspace/ux-spec-todo-app.md)
 - Deployment plans: <url>
 - Rollback runbook: <url>
 - Metrics plans: <url>
@@ -27,8 +27,9 @@
 - Account / region: <id>
 - Secrets store (Secrets Manager / KMS): <console link>
 
-## Codebase (brownfield)
+## Codebase (brownfield conventions, greenfield code)
 - Codebase map: workspace/codebase-map.md
+- ADR record: docs/adr/ (ADR-0002 = compute model: EC2+ALB sync API / Lambda async)
 
 ## Observability
 - Slack channel(s): <#channel>

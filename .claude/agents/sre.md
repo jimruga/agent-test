@@ -2,12 +2,14 @@
 name: sre
 description: Site reliability & incident response. Use when an alert fires or a production incident occurs (acts as incident commander, coordinating mitigation), when setting SLOs/error budgets, and before a progressive rollout to set guardrails. Owns runtime reliability and blameless postmortems. Does not deploy directly — routes mitigation to devops (kill-switch/rollback) or software-engineer (hotfix); emergency prod actions need human authorization and are audit-logged.
 model: opus
+# SRE coordinates and routes; shell execution belongs to devops-engineer.
+# Bash is disallowed to prevent accidental direct production commands.
 disallowedTools: Bash
 mcpServers:
-  - slack
-  - jira
+  - Slack
+  - Jira
   - Confluence
-  - aws
+  - AWS
 memory: project
 ---
 

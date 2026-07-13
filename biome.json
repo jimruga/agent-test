@@ -1,0 +1,52 @@
+{
+  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": {
+    "include": ["apps/**", "packages/**"],
+    "ignore": [
+      "**/dist/**",
+      "**/coverage/**",
+      "**/node_modules/**",
+      "apps/web/src/client/**",
+      "apps/web/src/routeTree.gen.ts"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "semicolons": "asNeeded",
+      "trailingCommas": "all"
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "style": {
+        "noDefaultExport": "error",
+        "useNodejsImportProtocol": "error"
+      },
+      "suspicious": {
+        "noConsoleLog": "warn"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "include": [
+        "**/*.config.ts",
+        "**/vite.config.ts",
+        "**/vitest.config.ts",
+        "apps/web/openapi-ts.config.ts",
+        "apps/api/knexfile.ts"
+      ],
+      "linter": { "rules": { "style": { "noDefaultExport": "off" } } }
+    }
+  ]
+}

@@ -32,7 +32,10 @@ jobs:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }          # full history so the tamper diff has a base
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        with: { node-version: "26" }
+      # Pin npm to the declared packageManager version for reproducible resolution.
+      - name: Pin npm (match packageManager)
+        run: npm i -g npm@12.0.1 && npm --version
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - name: Resolve diff base
@@ -66,12 +69,57 @@ jobs:
       # Proves the migration actually applies AND rolls back — not that an agent
       # said it would. Replace the two commands with your migration runner
       # (e.g. npm run migrate:up / migrate:down, alembic upgrade/downgrade, sqitch).
-      - name: Apply then roll back
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.run == 'true'
+        with: { node-version: "26" }
+      - name: Pin npm (match packageManager)
+        if: steps.gate.outputs.run == 'true'
+        run: npm i -g npm@12.0.1 && npm --version
+      - name: Apply then roll back (Knex; migrations owned by data-engineer)
         if: steps.gate.outputs.run == 'true'
         run: |
-          echo "TODO: project migration runner, e.g.:"
-          echo "  npm --prefix api run migrate:up && npm --prefix api run migrate:down"
-          # The job must FAIL if either direction errors. Wire your runner above.
+          set -e
+          npm ci --no-audit --no-fund
+          # Fails the job if EITHER direction errors (proves a true inverse `down`).
+          npm --workspace @repo/api run migrate:up
+          npm --workspace @repo/api run migrate:down
+
+  integration:
+    name: Integration (repositories vs ephemeral Postgres)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: ci, POSTGRES_DB: ci }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s
+          --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: postgres://postgres:ci@localhost:5432/ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Skip if no relational migrations
+        id: gate
+        run: |
+          if [ -d migrations ] && ls migrations/* >/dev/null 2>&1; then echo "run=true" >> "$GITHUB_OUTPUT";
+          else echo "run=false" >> "$GITHUB_OUTPUT"; echo "No migrations/ — no relational integration lane."; fi
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.run == 'true'
+        with: { node-version: "26" }
+      - name: Pin npm (match packageManager)
+        if: steps.gate.outputs.run == 'true'
+        run: npm i -g npm@12.0.1 && npm --version
+      # Apply the real schema, then exercise the production repository adapters
+      # (KnexUserRepository, ...) against it — the code the no-DB unit lane can't
+      # cover (review W4). Proves the SQL, not just the in-memory fake.
+      - name: Apply migrations then run repository integration tests
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          set -e
+          npm ci --no-audit --no-fund
+          npm --workspace @repo/api run migrate:up
+          npm --workspace @repo/api run test:integration
 
   sca:
     name: Dependency scan + SBOM (supply chain)
@@ -79,13 +127,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        with: { node-version: "26" }
+      - name: Pin npm (match packageManager)
+        run: npm i -g npm@12.0.1 && npm --version
       - name: npm audit (fail on high/critical)
         run: |
-          for d in ux api application; do
-            [ -f "$d/package-lock.json" ] || continue
-            ( cd "$d" && npm ci --no-audit --no-fund && npm audit --audit-level=high )
-          done
+          # Single lockfile at the workspace root (apps/*, packages/*).
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --no-fund
+            npm audit --audit-level=high
+          else
+            echo "no root package-lock.json yet"
+          fi
       - name: pip-audit (if python present)
         run: |
           if ls **/requirements*.txt >/dev/null 2>&1; then
@@ -99,7 +152,7 @@ jobs:
 
   all-green:
     name: all-green
-    needs: [secret-scan, verify, migrations, sca]
+    needs: [secret-scan, verify, migrations, integration, sca]
     runs-on: ubuntu-latest
     steps:
       - run: echo "All required checks passed."

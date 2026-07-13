@@ -4,10 +4,10 @@ description: Application and infrastructure security specialist. Use to review c
 model: opus
 disallowedTools: Write, Edit
 mcpServers:
-  - github
-  - aws
-  - jira
-  - slack
+  - GitHub
+  - AWS
+  - Jira
+  - Slack
 skills:
   - oauth2-patterns
   - aws-security
@@ -52,5 +52,6 @@ NEXT: route to pm — security review clean | gate: none
 Re-review after any fix before clearing.
 
 You own the *technical* controls; the **compliance** agent maps them to
-frameworks and checks evidence. Route framework/evidence gaps to compliance and
-fix technical findings yourself.
+frameworks and checks evidence. Route framework/evidence gaps to compliance; route
+technical application findings to software-engineer and infrastructure findings to
+devops-engineer for fixing; re-review after each fix.

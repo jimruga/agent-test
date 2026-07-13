@@ -23,9 +23,13 @@ run() { echo "── $1"; if "${@:2}"; then echo "   ok"; else echo "   FAIL: $1
 tamper_check() {
   echo "── tamper check (no disabled/deleted tests)"
   local diff added deleted
-  diff="$(git diff --unified=0 "$BASE"...HEAD 2>/dev/null || git diff --unified=0 "$BASE" 2>/dev/null || true)"
+  # Scan ONLY test-file changes — the control is about disabled/deleted TESTS.
+  # Restricting the diff by pathspec prevents false positives from non-test code
+  # (e.g. process.exit in an entrypoint) and from edits to this control itself.
+  tp=('*.test.*' '*.spec.*' '*_test.*' 'test_*.py' '*/tests/*' '*/__tests__/*')
+  diff="$(git diff --unified=0 "$BASE"...HEAD -- "${tp[@]}" 2>/dev/null || git diff --unified=0 "$BASE" -- "${tp[@]}" 2>/dev/null || true)"
   added="$(printf '%s\n' "$diff" | grep -E '^\+' \
-    | grep -Ei '(\.only\()|(it\.only)|(describe\.only)|(test\.only)|(\.skip\()|(xit\()|(xdescribe\()|(@pytest\.mark\.(skip|xfail))|(@unittest\.skip)|(\bt\.Skip(Now)?\b)' || true)"
+    | grep -Ei '(\.only\()|(it\.only)|(describe\.only)|(test\.only)|(\.skip\()|(\bxit\()|(\bxdescribe\()|(@pytest\.mark\.(skip|xfail))|(@unittest\.skip)|(\bt\.Skip(Now)?\b)' || true)"
   deleted="$(git diff --name-status "$BASE"...HEAD 2>/dev/null | grep -E '^(D|R)' | grep -Ei '(\.test\.|\.spec\.|_test\.|test_.*\.py|/tests?/)' || true)"
   if [ -n "$added" ] || [ -n "$deleted" ]; then
     echo "   FAIL: test tampering detected"
@@ -36,17 +40,19 @@ tamper_check() {
   else echo "   ok"; fi
 }
 
-# ── JavaScript / React areas (ux, api, application) ───────────────────────
-for dir in ux api application; do
-  [ -f "$dir/package.json" ] || continue
-  echo "## $dir (node)"
-  if [ "$MODE" = "full" ]; then ( cd "$dir" && run "$dir: install" npm ci --no-audit --no-fund ); fi
-  if [ "$MODE" = "full" ] || [ -d "$dir/node_modules" ]; then
-    ( cd "$dir" && npm run 2>/dev/null | grep -q ' lint'      ) && ( cd "$dir" && run "$dir: lint"      npm run lint )
-    ( cd "$dir" && npm run 2>/dev/null | grep -q ' typecheck' ) && ( cd "$dir" && run "$dir: typecheck" npm run typecheck )
+# ── JavaScript / TypeScript monorepo (npm workspaces: apps/*, packages/*) ──────
+# The root package.json defines the workspaces and the aggregate scripts
+# (typecheck/lint/test). Coverage thresholds are enforced by the test runner
+# itself (vitest coverage.thresholds), so a passing `npm test` is a covered run.
+if [ -f package.json ] && grep -q '"workspaces"' package.json; then
+  echo "## monorepo (node / npm workspaces)"
+  if [ "$MODE" = "full" ]; then run "install" npm ci --no-audit --no-fund; fi
+  if [ "$MODE" = "full" ] || [ -d node_modules ]; then
+    run "typecheck" npm run typecheck
+    run "lint" npm run lint
   else echo "   (fast mode, deps not installed — lint/typecheck deferred to CI)"; fi
-  if [ "$MODE" = "full" ]; then ( cd "$dir" && run "$dir: test+coverage" npm test -- --coverage --watchAll=false ); fi
-done
+  if [ "$MODE" = "full" ]; then run "test+coverage" npm test; fi
+fi
 
 # ── Python areas (Lambdas / services) ─────────────────────────────────────
 if ls **/pyproject.toml requirements*.txt >/dev/null 2>&1; then
@@ -66,3 +72,4 @@ tamper_check
 echo
 if [ "$fails" -eq 0 ]; then echo "VERIFY: PASS (mode=$MODE)"; exit 0
 else echo "VERIFY: FAIL — $fails check(s) failed (mode=$MODE)"; exit 1; fi
+

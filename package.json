@@ -1,0 +1,36 @@
+{
+  "name": "team-todo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Team To-Do App (MVP) — monorepo root. First service on the platform.",
+  "packageManager": "npm@12.0.1",
+  "engines": {
+    "node": ">=26 <27",
+    "npm": ">=12 <13"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspace apps/api",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "check": "npm run typecheck && npm run lint && npm run test",
+    "gen:client": "npm run gen:client --workspace apps/web"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4",
+    "@vitest/coverage-v8": "^4.1.10",
+    "typescript": "~5.6.0",
+    "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "@hey-api/openapi-ts": "0.99.0",
+    "fastify": "5.10.0",
+    "vite": "8.1.4"
+  }
+}
