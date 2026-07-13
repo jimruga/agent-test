@@ -495,3 +495,135 @@ engineer. Frontend + backend can parallelize per-slice once the contract is froz
 (WIP-limit 2), compressing calendar time but not the hour total. S2 (tenancy) and S9
 (erasure) are the highest-variance items — the pessimistic tail is dominated by them
 plus the regulated a11y (S10) verification.
+
+---
+
+## Manifest regression — DEFINITIVE fix (2026-07-13, iter 5/CI loop ~7)
+
+The three package.json manifests had **reverted** to the vite8 / vitest4 /
+openapi-ts0.99 "experiment" state, plus a **bogus `nvm@0.0.4`** dependency and a
+dead `allowScripts` field. CI (linux-x64) failed on missing native bindings
+(`@biomejs/cli-linux-x64`, `@rolldown/binding-linux-x64-gnu`) — the npm
+cross-platform optional-deps bug, triggered because **vite 8 pulls rolldown**
+(native bindings) and the committed lock was generated on darwin.
+
+### WHY it reverted — root cause (investigated, plainly)
+**Not a git history operation.** Evidence:
+- `git reflog` is a clean linear chain: clone → `checkout` to
+  `feature/s0-s1-foundation-auth` → 6 ordinary commits. **No `reset`, `rebase`,
+  `revert`, file-`checkout`, or `stash` entry exists.**
+- `git status` = working tree clean; `git stash list` = empty.
+
+So no stash pop / no `git checkout .` / no `git reset` re-reverted my fixes. The
+regression entered through **ordinary commits carrying `npm`-mutated manifests**:
+
+1. **`7adef57`** ("Fix CI: reconcile deps…") first introduced the experiment into
+   the *committed* root manifest: bumped vitest `~2.1.0`→`^4.1.10`, added a
+   `dependencies` block (`@hey-api/openapi-ts 0.99.0`, `fastify 5.10.0`,
+   `vite 8.1.4`) and the dead `allowScripts {}`.
+2. **`dbbc2e3`** partially cleaned it (pinned openapi-ts back to `0.53.12` in all
+   three manifests) but **left** vitest4 / vite8 / the root deps / allowScripts.
+3. **`76a32a6`** ("Pin Node 20; sync lockfile under Node 20") **re-reverted**
+   openapi-ts `0.53.12`→`^0.99.0` in root + apps/api + apps/web **and added
+   `nvm ^0.0.4`** to root deps.
+
+The `nvm ^0.0.4` + `allowScripts {}` are the fingerprint of a stray **`npm install
+nvm`** — `nvm` is a *shell* tool (`nvm use`), not an npm library; the published
+`nvm` package is an abandoned 0.0.4 stub. That `npm install` **mutated** the root
+`package.json` in place (added the dep) and the subsequent "sync lockfile" re-resolve
+loosened/reverted the ranges; all of it was then **committed wholesale** under a
+"sync lockfile" message without diffing the manifest. **Mechanism = `npm install
+<pkg>` silently rewriting `package.json`, then committing the mutated manifest.**
+
+### Prevention (so it can't recur)
+- **Never `npm install <pkg>` casually** on this repo — it rewrites `package.json`.
+  Add deps by editing the manifest by hand, then `npm install` (no package arg) to
+  regenerate only the lock.
+- **Exact-pin all volatile tooling** (done below) so a re-resolve cannot drift.
+- **Diff `package.json` before committing any "lockfile sync"** — a lock-sync
+  commit must show *zero* manifest changes, or it is not a sync.
+
+### What I restored — the clean, coherent manifests
+Changed files (verify.sh **NOT** touched — PM-owned control):
+`package.json`, `apps/api/package.json`, `apps/web/package.json`,
+`apps/web/openapi-ts.config.ts`.
+
+- **root** — removed the bogus `nvm`, the dead `allowScripts`, and the entire
+  misplaced `dependencies` block (fastify/vite/openapi-ts do not belong at root).
+  Root now carries only genuine workspace-wide devDeps: `@biomejs/biome 1.9.4`,
+  `typescript ~5.6.0`, `vitest 2.1.9`, `@vitest/coverage-v8 2.1.9`. Kept `engines`
+  (node `>=20 <21`, npm `>=10 <11`) and the PM's `.nvmrc`=20.
+- **apps/api** — `fastify ~5.1.0` (per the CLAUDE.md stack line, was `^5.10.0`);
+  removed the misplaced `vite` and `@hey-api/openapi-ts` (the API imports neither —
+  grep-confirmed); `vitest`/`@vitest/coverage-v8` exact-pinned `2.1.9`.
+- **apps/web** — removed the misplaced `fastify` dep (the React app never imports
+  it — grep-confirmed); moved `@hey-api/openapi-ts` from deps intent to a
+  **devDependency** pinned `0.53.12` (it is a build-time codegen tool, not runtime,
+  and lives only in the workspace that generates the client); `vite` **`5.4.21`**
+  (was `^8.1.4`).
+
+### WHY vite 5.4 / vitest 2.1 — do NOT "upgrade" back into the trap
+**vite 8 pulls `rolldown`, whose Rust native bindings are per-platform optional
+deps.** npm has a known cross-platform optional-deps bug: a lock generated on darwin
+omits the linux binding, so `npm ci` on the linux-x64 CI runner fails with
+`@rolldown/binding-linux-x64-gnu` missing (biome's `@biomejs/cli-linux-x64` hits the
+same class of bug). **vite 5.4 uses esbuild/rollup — no rolldown — so it avoids the
+native-binding failure entirely.** vitest 2.1 is the matching peer for vite ^5 /
+`@vitejs/plugin-react` 4.3 / React 19 (a matrix whose mutual peer-compatibility is
+known-good), whereas vitest 4 pulls the vite-8/rolldown line. **Local (darwin)
+`verify` passing is NOT evidence CI (linux) is green when rolldown bindings are in
+play** — that mismatch is exactly what caused this loop. Rationale committed here
+and in the codegen config comment so nobody re-bumps.
+
+### openapi-ts.config.ts reconciled to the 0.53.x API
+Changed `plugins: ['@hey-api/client-fetch']` (the 0.54+/0.99 array API — would throw
+on 0.53.x) to the 0.53.x top-level `client: '@hey-api/client-fetch'`. This keeps
+`make claude-gen-client` from breaking later. No generated client exists yet
+(skeleton) and `gen:client` is not in `verify.sh`, so this does not affect today's
+gate. **Note for the frontend-engineer:** when the client is first generated, the
+generated fetch client may need `@hey-api/client-fetch` added as a web dependency —
+add it in the same change set as the first `make claude-gen-client` (don't add an
+unverified runtime dep now).
+
+### FOOLPROOF human command sequence (branch `feature/s0-s1-foundation-auth`, repo root)
+`git commit` + `npm install` are unavailable in the Claude sandbox — the human runs
+these. Do them **in order**; do not interleave any `git checkout`/`reset`/`stash`.
+
+```
+# 0) Confirm you are on the branch with the clean manifests and NOTHING is stashed.
+git status                 # must show only the 4 manifest/config files modified
+git stash list             # must be EMPTY — a stray stash pop is how state reverts
+#    DO NOT run `git checkout .`, `git reset --hard`, `git stash pop`, or
+#    `git restore` here — any of them can re-revert the manifests. If you must,
+#    inspect first.
+
+# 1) Remove the bogus package from the installed tree (belt-and-suspenders; the
+#    manifest no longer lists it, but the old node_modules/lock still may).
+npm uninstall nvm 2>/dev/null || true    # no-op if already gone
+#    (Do NOT run `npm install nvm` ever — nvm is a shell tool, not an npm package.)
+
+# 2) Regenerate the lock on NODE 20 from the clean manifests. Delete the stale lock
+#    first so npm resolves purely from package.json (the old lock still points at
+#    vite8/vitest4/openapi0.99). Use Node 20 so engines + native bindings match CI.
+nvm use 20                 # or: fnm use 20 — honor .nvmrc (=20). SHELL command.
+node -v                    # must print v20.x
+rm -f package-lock.json
+npm install                # NO package argument — regenerates the lock only
+
+# 3) Prove it locally the way CI will (Node 20). npm ci is the real lockfile gate.
+rm -rf node_modules
+npm ci                     # must succeed — fails if lock<->manifest drift remains
+./verify.sh                # lint + typecheck + test + coverage + anti-tamper; must pass
+#    (verify.sh must stay executable = 100755; if the bit was lost: chmod +x verify.sh)
+
+# 4) Commit ALL manifest changes + the regenerated lock TOGETHER, so the clean state
+#    is what lands as one unit (never commit manifests without the matching lock).
+git add package.json apps/api/package.json apps/web/package.json \
+        apps/web/openapi-ts.config.ts package-lock.json
+git commit -m "fix(ci): restore clean workspace manifests; pin vite 5.4.21/vitest 2.1.9; drop bogus nvm dep + allowScripts"
+git push
+```
+Then CI re-runs `verify.sh` (Node 20, linux) + the migrations + integration lanes →
+`all-green` is the binding signal. If CI still shows a native-binding miss, the lock
+was regenerated on the wrong Node/platform — repeat step 2 on Node 20; do **not**
+reintroduce vite 8.

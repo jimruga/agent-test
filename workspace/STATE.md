@@ -10,9 +10,11 @@
 - **Human steps (iter 5):** rm package-lock.json && npm install (openapi-ts 0.99→0.53.12); chmod +x verify.sh (edit reset it); git add -A; confirm verify.sh=100755; commit; push → CI all-green → compliance attest → Gate 5.
 - **Control changes (audit #3, #4):** verify.sh tamper-check regex anchored + scoped to test-file diffs (human-approved).
 - **Follow-ups (non-blocking):** openapi-ts config API reconcile at first gen:client; dependency-hygiene cleanup (@hey-api runtime-dep + fastify/vite misplacements).
-- **Tamper check now PASSES** (control fix worked). Remaining real fail = install only (lockfile out of sync: missing magicast@0.3.5); typecheck/lint/test cascade from it.
-- **ROOT CAUSE (recurring lock blocker, 3x): lock generated on Node 26 vs CI Node 20 → transitive-dep resolution mismatch.** FIX: regen lock under Node 20 + run `npm ci` & `./verify.sh` LOCALLY on Node 20 to prove green before push. Recommend .nvmrc/engines pin.
-- **CI-greening loop count: 5** (distinct issues; loop-guard no thrash, but lock-sync sub-issue recurring → escalated root cause to human).
+- **REGRESSION:** all 3 manifests reverted to vite8/vitest4/openapi0.99 experiment + bogus `nvm@0.0.4` installed. CI(linux) fails on missing biome/rolldown linux native bindings (npm cross-platform optional-deps bug; vite8→rolldown). tamper+typecheck now pass.
+- **Definitive fix DONE (engineer):** revert cause = stray `npm install nvm` mutated manifests, committed via 76a32a6 "sync lockfile" (NOT a git op — reflog clean). Restored 4 files (manifests + openapi-ts.config); removed nvm/allowScripts/misplaced deps; pinned vite5.4.21/vitest2.1.9/openapi-ts0.53.12-web-devDep. verify.sh untouched. No app logic changed.
+- **Prevention:** lock-sync commits must show ZERO manifest diff; never casual `npm install <pkg>`; `nvm use` is a shell cmd.
+- **Human steps (iter 7):** npm uninstall nvm → Node20 rm lock+install → rm node_modules+npm ci+./verify.sh green → diff-check → commit 4 files+lock → push. CI(linux) = binding.
+- **CI-greening loops: ~7 (all env/tooling, NOT feature defects; auth suite 65 tests/96% cov + tamper + typecheck green).** loop-guard: no agent thrash.
 - **Reviews done + fixes applied:** security + code review returned; all must-fix items resolved & staged on feature/s0-s1-foundation-auth (C1 gitignore, W2 knex TS loader, F1/W3 nonce fail-closed, F2 PII-safe logs, W4 repo integration lane in all-green, + timingSafeEqual, CLAUDE.md versions). Not executed (no registry/node in sandbox) — CI is the verifier.
 - **BLOCKED ON HUMAN:** commit branch + `npm install` (lockfile) + push + open PR → CI all-green (now incl. integration lane) → then pm runs compliance attestation → request Gate 5.
 - **Deploy-time (Gate 6) queue:** JWKS real verify (eng), Secrets Manager IAM + Redis private/TLS/KMS + RDS/KMS + app_runtime role + rate limiting + edge headers (devops).
