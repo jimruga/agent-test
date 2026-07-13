@@ -30,15 +30,18 @@ describe('error envelope helpers', () => {
 })
 
 describe('safeErrorLogFields (no PII / no pg detail leaks — sec F2)', () => {
-  it('keeps only allowlisted fields and drops pg detail/where/table/column/parameters', () => {
-    // Simulate a node-postgres unique-violation error: the PII lives in the
-    // driver-populated fields (detail/where), NOT in the generic message.
+  it('keeps only allowlisted structural fields and drops message/stack + pg detail/hint/where/etc', () => {
+    // Simulate a node-postgres unique-violation error: PII can live BOTH in the
+    // driver-populated fields (detail/hint/where) AND in the message/stack (a
+    // message can embed an interpolated email or an OAuth response body).
     const pgErr = Object.assign(
-      new Error('duplicate key value violates unique constraint "users_email_unique_active"'),
+      new Error('duplicate key: contact ada@example.com already exists'),
       {
         name: 'error',
         code: '23505',
+        statusCode: 500,
         detail: 'Key (email)=(ada@example.com) already exists.',
+        hint: 'Consider ada@example.com',
         where: 'row for relation "users"',
         table: 'users',
         column: 'email',
@@ -51,13 +54,15 @@ describe('safeErrorLogFields (no PII / no pg detail leaks — sec F2)', () => {
 
     const fields = safeErrorLogFields(pgErr)
 
-    // Allowlisted safe fields present.
-    expect(fields).toMatchObject({ name: 'error', code: '23505' })
-    expect(fields.message).toContain('unique constraint')
+    // Safe structural fields present when set on the input.
+    expect(fields).toMatchObject({ name: 'error', code: '23505', statusCode: 500 })
 
-    // None of the PII-bearing / internal pg fields are serialized.
+    // Free-text / PII-bearing / internal fields must NOT be serialized.
     for (const banned of [
+      'message',
+      'stack',
       'detail',
+      'hint',
       'where',
       'table',
       'column',

@@ -1,0 +1,90 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Team To-Do App - edge protection (ddos-protection skill). WAFv2 REGIONAL WebACL
+  associated to the ALB: AWS managed rule groups (OWASP Common, KnownBadInputs,
+  SQLi) + a RATE-BASED rule scoped to /api/auth/* (F8 brute-force / L7 abuse).
+  AWS Shield Standard is always-on for L3/L4 (no resource needed).
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [staging, production]
+  AuthRateLimit:
+    Type: Number
+    Default: 100
+    Description: Max requests per 5-min window per IP to /api/auth/* before block.
+
+Resources:
+  WebAcl:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: !Sub "ttd-${Environment}-web-acl"
+      Scope: REGIONAL
+      DefaultAction: { Allow: {} }
+      VisibilityConfig:
+        SampledRequestsEnabled: true
+        CloudWatchMetricsEnabled: true
+        MetricName: !Sub "ttd-${Environment}-web-acl"
+      Rules:
+        - Name: AWSCommonRuleSet
+          Priority: 0
+          OverrideAction: { None: {} }
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesCommonRuleSet
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: common
+        - Name: AWSKnownBadInputs
+          Priority: 1
+          OverrideAction: { None: {} }
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesKnownBadInputsRuleSet
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: knownbad
+        - Name: AWSSQLi
+          Priority: 2
+          OverrideAction: { None: {} }
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesSQLiRuleSet
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: sqli
+        # F8: rate-based rule scoped to the auth surface (brute-force / Redis-fill).
+        - Name: AuthRateLimit
+          Priority: 3
+          Action: { Block: {} }
+          Statement:
+            RateBasedStatement:
+              Limit: !Ref AuthRateLimit
+              AggregateKeyType: IP
+              ScopeDownStatement:
+                ByteMatchStatement:
+                  FieldToMatch: { UriPath: {} }
+                  PositionalConstraint: STARTS_WITH
+                  SearchString: /api/auth/
+                  TextTransformations: [{ Priority: 0, Type: LOWERCASE }]
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: authratelimit
+
+  WebAclAssociation:
+    Type: AWS::WAFv2::WebACLAssociation
+    Properties:
+      ResourceArn: { "Fn::ImportValue": !Sub "ttd-${Environment}-AlbArn" }
+      WebACLArn: !GetAtt WebAcl.Arn
+
+Outputs:
+  WebAclArn:
+    Value: !GetAtt WebAcl.Arn
+    Export: { Name: !Sub "ttd-${Environment}-WebAclArn" }

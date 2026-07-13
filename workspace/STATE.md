@@ -5,7 +5,9 @@
 - **Active feature:** Team To-Do App (MVP) — collaborative multi-user task management
 - **Lifecycle phase:** architecture / technical design (Gate 2 APPROVED; working toward Gate 3 Tdd)
 - **Lifecycle phase:** implementation (Gate 4 APPROVED; building S0+S1 test-driven, behind flag)
-- **Current owner (agent):** HUMAN (commit for CI iter 9 — Node26/npm12 upgrade + lockfile regen). Gate 5 NOT requested.
+- **Current owner (agent):** HUMAN — Gate 6 (Infra Plan Review) requested. Deploy plan: workspace/deploy-plan-s0-s1.md
+- **Gate 5 RESULT (human:Jim 2026-07-13):** PR APPROVED for merge. SHA a994e49b1e9f2a83ab6609b61c88e1f99e9a546c. CI run: https://github.com/jimruga/agent-test/actions/runs/29286915520/job/86941685260. Audit #5 GATE_APPROVED recorded.
+- **⚠️ REGULATED: Gate 6 deploy authorizer MUST differ from Gate 5 approver (Jim).**
 - **TOOLCHAIN UPGRADE DONE (Node ~26 / npm ~12):** engineer applied Node26/npm12 upgrade per ADR-0005. All CI failures from previous iterations fixed. Lockfile must be regenerated on linux with npm@12.0.1 (same 4-step no-Docker path, updated version strings). CI on Node 26 is the binding check.
 - **Human steps (iter 9):** commit+push Node26/npm12 changes (package.json, .nvmrc, apps/api/package.json, ci.yml, ADR-0005) + regenerate lockfile locally (`rm -f package-lock.json && npm install`) + `git add package-lock.json` + commit+push → CI all-green. No docker, no linux required. Full notes in ci-toolchain-fix.md.
 - **Control changes (audit #3, #4):** verify.sh tamper-check regex anchored + scoped to test-file diffs (human-approved).
@@ -25,7 +27,8 @@
 - **S0/S1 status:** authored+staged on branch feature/s0-s1-foundation-auth; ADR-0004 (bootstrap). Must-wire before Gate 6: JWKS id-token verify (security), Secrets Manager resolver + ElastiCache (devops).
 - **Gate 3 RESULT (human:Jim):** TDD APPROVED; API framework = **FASTIFY** (ADR-0003; api-conventions.md corrected Hono→Fastify in bootstrap PR); token budget raised to **6M alloc / 7M cap** (audit #2).
 - **Gate 4 RESULT (human:Jim):** story backlog APPROVED (workspace/stories-todo-app.md): S0.1-0.3 + S1-S11.
-- **Pending human gate:** 5 PR Acceptance (requested only when PR all-green + independent review + compliance attestation)
+- **Pending human gate:** 7 E2E Acceptance (after staging deploy + smoke suite green)
+- **Gate 6 RESULT (human:JoeDoyle23 2026-07-13):** DEPLOY_AUTHORIZED. PR https://github.com/jimruga/agent-test/pull/1. SoD satisfied (JoeDoyle23 ≠ Jim). Audit #6 recorded.
 - **Pending before Gate 5:** retention-window defaults → compliance; auth-table RLS → security deep review; clocktime baseline (from engineer).
 - **PM-decided at Gate 3 (noted, not human gate):** list-name unique per team (case-insensitive); approve retention-purge scheduled job; accept metrics via Postgres rollups + Heap (no new pipeline). Routing retention-window defaults + auth-table RLS to compliance/security for sign-off before Gate 5.
 - **⚠️ Control gaps to fix:** budget-threshold hook not recording used_tokens (auto hard-cap enforcement inactive → manual spend monitoring in place); missing clocktime baseline in budget.json (set before Gate 4).

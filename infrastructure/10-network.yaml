@@ -1,0 +1,302 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Team To-Do App - network layer. VPC with public + private-app + private-data
+  subnets across 2 AZs, NAT, interface VPC endpoints (keep Secrets Manager / KMS
+  traffic OFF the public internet and cut NAT data cost per ADR-0002), and
+  least-privilege security groups (SG-to-SG references, no 0.0.0.0/0 except the
+  public ALB on 443). aws-security skill: no db/cache public endpoints.
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [staging, production]
+  VpcCidr:
+    Type: String
+    Default: 10.20.0.0/16
+  SingleNatGateway:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: staging uses one NAT (cost); production uses one-per-AZ (HA).
+
+Conditions:
+  IsProd: !Equals [!Ref Environment, production]
+  OneNat: !Equals [!Ref SingleNatGateway, "true"]
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags: [{ Key: Name, Value: !Sub "ttd-${Environment}-vpc" }]
+
+  Igw:
+    Type: AWS::EC2::InternetGateway
+  IgwAttach:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: { VpcId: !Ref Vpc, InternetGatewayId: !Ref Igw }
+
+  # --- Public subnets (ALB + NAT only) ---
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock: !Select [0, !Cidr [!Ref VpcCidr, 6, 8]]
+      MapPublicIpOnLaunch: true
+      Tags: [{ Key: Name, Value: !Sub "ttd-${Environment}-public-a" }]
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock: !Select [1, !Cidr [!Ref VpcCidr, 6, 8]]
+      MapPublicIpOnLaunch: true
+      Tags: [{ Key: Name, Value: !Sub "ttd-${Environment}-public-b" }]
+
+  # --- Private-app subnets (EC2) ---
+  AppSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock: !Select [2, !Cidr [!Ref VpcCidr, 6, 8]]
+      Tags: [{ Key: Name, Value: !Sub "ttd-${Environment}-app-a" }]
+  AppSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock: !Select [3, !Cidr [!Ref VpcCidr, 6, 8]]
+      Tags: [{ Key: Name, Value: !Sub "ttd-${Environment}-app-b" }]
+
+  # --- Private-data subnets (RDS + ElastiCache) ---
+  DataSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock: !Select [4, !Cidr [!Ref VpcCidr, 6, 8]]
+      Tags: [{ Key: Name, Value: !Sub "ttd-${Environment}-data-a" }]
+  DataSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock: !Select [5, !Cidr [!Ref VpcCidr, 6, 8]]
+      Tags: [{ Key: Name, Value: !Sub "ttd-${Environment}-data-b" }]
+
+  # --- Routing ---
+  PublicRt:
+    Type: AWS::EC2::RouteTable
+    Properties: { VpcId: !Ref Vpc }
+  PublicDefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: IgwAttach
+    Properties:
+      RouteTableId: !Ref PublicRt
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref Igw
+  PublicAssocA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref PublicSubnetA, RouteTableId: !Ref PublicRt }
+  PublicAssocB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref PublicSubnetB, RouteTableId: !Ref PublicRt }
+
+  NatEipA:
+    Type: AWS::EC2::EIP
+    Properties: { Domain: vpc }
+  NatGatewayA:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatEipA.AllocationId
+      SubnetId: !Ref PublicSubnetA
+  NatEipB:
+    Type: AWS::EC2::EIP
+    Condition: IsProd
+    Properties: { Domain: vpc }
+  NatGatewayB:
+    Type: AWS::EC2::NatGateway
+    Condition: IsProd
+    Properties:
+      AllocationId: !GetAtt NatEipB.AllocationId
+      SubnetId: !Ref PublicSubnetB
+
+  PrivateRtA:
+    Type: AWS::EC2::RouteTable
+    Properties: { VpcId: !Ref Vpc }
+  PrivateRouteA:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRtA
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayA
+  PrivateRtB:
+    Type: AWS::EC2::RouteTable
+    Properties: { VpcId: !Ref Vpc }
+  PrivateRouteB:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRtB
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !If [IsProd, !Ref NatGatewayB, !Ref NatGatewayA]
+  AppAssocA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref AppSubnetA, RouteTableId: !Ref PrivateRtA }
+  AppAssocB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref AppSubnetB, RouteTableId: !Ref PrivateRtB }
+  DataAssocA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref DataSubnetA, RouteTableId: !Ref PrivateRtA }
+  DataAssocB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref DataSubnetB, RouteTableId: !Ref PrivateRtB }
+
+  # --- Security groups (least privilege; SG-to-SG, not CIDR) ---
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Public ALB - 443 from internet only
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0, Description: HTTPS }
+        - { IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0, Description: HTTP redirect to 443 }
+      Tags: [{ Key: Name, Value: !Sub "ttd-${Environment}-alb-sg" }]
+
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: EC2 app - app port from ALB SG only
+      VpcId: !Ref Vpc
+      Tags: [{ Key: Name, Value: !Sub "ttd-${Environment}-app-sg" }]
+  AppFromAlb:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref AppSecurityGroup
+      IpProtocol: tcp
+      FromPort: 3001
+      ToPort: 3001
+      SourceSecurityGroupId: !Ref AlbSecurityGroup
+      Description: App port from ALB only
+
+  DbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: RDS Postgres - 5432 from app SG only (F6)
+      VpcId: !Ref Vpc
+      Tags: [{ Key: Name, Value: !Sub "ttd-${Environment}-db-sg" }]
+  DbFromApp:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref DbSecurityGroup
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
+      SourceSecurityGroupId: !Ref AppSecurityGroup
+      Description: Postgres from app SG only - NO 0.0.0.0/0
+
+  RedisSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ElastiCache Redis - 6379 from app SG only (F5)
+      VpcId: !Ref Vpc
+      Tags: [{ Key: Name, Value: !Sub "ttd-${Environment}-redis-sg" }]
+  RedisFromApp:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref RedisSecurityGroup
+      IpProtocol: tcp
+      FromPort: 6379
+      ToPort: 6379
+      SourceSecurityGroupId: !Ref AppSecurityGroup
+      Description: Redis (TLS) from app SG only - private endpoint only
+
+  # SG for interface VPC endpoints (443 from app SG)
+  EndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Interface VPC endpoints - 443 from app SG
+      VpcId: !Ref Vpc
+      Tags: [{ Key: Name, Value: !Sub "ttd-${Environment}-vpce-sg" }]
+  EndpointFromApp:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref EndpointSecurityGroup
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      SourceSecurityGroupId: !Ref AppSecurityGroup
+
+  # --- VPC endpoints: Secrets Manager + KMS traffic stays inside the VPC (F4/F6),
+  #     and offloads NAT data-processing cost (ADR-0002 cost lever). ---
+  SecretsManagerEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.secretsmanager"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds: [!Ref AppSubnetA, !Ref AppSubnetB]
+      SecurityGroupIds: [!Ref EndpointSecurityGroup]
+  KmsEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.kms"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds: [!Ref AppSubnetA, !Ref AppSubnetB]
+      SecurityGroupIds: [!Ref EndpointSecurityGroup]
+  LogsEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.logs"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds: [!Ref AppSubnetA, !Ref AppSubnetB]
+      SecurityGroupIds: [!Ref EndpointSecurityGroup]
+  SsmEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ssm"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds: [!Ref AppSubnetA, !Ref AppSubnetB]
+      SecurityGroupIds: [!Ref EndpointSecurityGroup]
+  S3GatewayEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+      VpcEndpointType: Gateway
+      RouteTableIds: [!Ref PrivateRtA, !Ref PrivateRtB]
+
+Outputs:
+  VpcId: { Value: !Ref Vpc, Export: { Name: !Sub "ttd-${Environment}-VpcId" } }
+  PublicSubnets:
+    Value: !Join [",", [!Ref PublicSubnetA, !Ref PublicSubnetB]]
+    Export: { Name: !Sub "ttd-${Environment}-PublicSubnets" }
+  AppSubnets:
+    Value: !Join [",", [!Ref AppSubnetA, !Ref AppSubnetB]]
+    Export: { Name: !Sub "ttd-${Environment}-AppSubnets" }
+  DataSubnets:
+    Value: !Join [",", [!Ref DataSubnetA, !Ref DataSubnetB]]
+    Export: { Name: !Sub "ttd-${Environment}-DataSubnets" }
+  AlbSecurityGroupId:
+    Value: !Ref AlbSecurityGroup
+    Export: { Name: !Sub "ttd-${Environment}-AlbSgId" }
+  AppSecurityGroupId:
+    Value: !Ref AppSecurityGroup
+    Export: { Name: !Sub "ttd-${Environment}-AppSgId" }
+  DbSecurityGroupId:
+    Value: !Ref DbSecurityGroup
+    Export: { Name: !Sub "ttd-${Environment}-DbSgId" }
+  RedisSecurityGroupId:
+    Value: !Ref RedisSecurityGroup
+    Export: { Name: !Sub "ttd-${Environment}-RedisSgId" }

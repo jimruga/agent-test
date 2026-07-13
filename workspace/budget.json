@@ -19,7 +19,15 @@
     "production": 210,
     "approved_total": 365,
     "estimate_total": 330,
-    "estimate_note": "approved_total is null pending human approval at Gate 1 (PRD Review). Combined AWS runtime estimate is $330/mo (staging $120 + production $210). Recommend approving with a ~10% buffer = $365/mo to absorb data-transfer/usage variance. Region us-east-1, priced 2026-07, on-demand. Excludes third-party SaaS monitoring (Datadog/Sentry/Logz.io/Heap), which is billed outside AWS."
+    "estimate_note": "approved_total is null pending human approval at Gate 1 (PRD Review). Combined AWS runtime estimate is $330/mo (staging $120 + production $210). Recommend approving with a ~10% buffer = $365/mo to absorb data-transfer/usage variance. Region us-east-1, priced 2026-07, on-demand. Excludes third-party SaaS monitoring (Datadog/Sentry/Logz.io/Heap), which is billed outside AWS.",
+    "gate6_recalc": {
+      "date": "2026-07-13",
+      "staging": 147,
+      "production": 226,
+      "gross_total": 373,
+      "with_staging_offhours_total": 335,
+      "note": "Gate 6 (deploy-plan-s0-s1.md §6): must-wire regulated security items add ~$43/mo gross (KMS, 6 Secrets/env, WAFv2, CloudWatch, VPC interface endpoints) partially offset by NAT data-processing savings from the endpoints (ADR-0002 lever). Gross ~$373 = ~$8 over the $365 approved. Applying the staging off-hours shutdown lever (ADR-0002) nets ~$335/mo combined -> back under $365, no separate overage approval needed. If off-hours not applied, ~$8 overage needs explicit human AWS-cost approval. EC2+ALB (ADR-0002) remains the cost-optimized choice for the p95<500ms SLO; no re-architecture warranted."
+    }
   },
   "notes": "PM sets allocated_tokens + hard_cap_tokens from the PRD at Gate 1. The hook updates used_tokens and thresholds_alerted automatically. hard_cap_tokens is the point at which new subagent dispatch is blocked until a human raises it. AWS runtime estimate set by devops-engineer; final estimated cost and any overage require human approval."
 }

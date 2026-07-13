@@ -47,6 +47,12 @@ export function sendError(
  * We therefore build the log record from an explicit allowlist and never spread
  * the error object, so any current or future pg/driver field is dropped by
  * construction rather than by blocklist.
+ *
+ * `message` and `stack` are also EXCLUDED (sec F2 re-verify): an Error message
+ * can embed an OAuth token-endpoint response body or application-interpolated
+ * PII (e.g. an email), and the stack re-embeds the message. We keep only
+ * structural, non-free-text fields (`name`, `code`, `statusCode`, `type`), which
+ * are enough to triage without shipping regulated content to Logz.io/Sentry.
  */
 export function safeErrorLogFields(err: unknown): Record<string, unknown> {
   if (!(err instanceof Error)) {
@@ -60,8 +66,6 @@ export function safeErrorLogFields(err: unknown): Record<string, unknown> {
   const statusCode = typeof withCode.statusCode === 'number' ? withCode.statusCode : undefined
   return {
     name: err.name,
-    message: err.message,
-    stack: err.stack,
     ...(code !== undefined ? { code } : {}),
     ...(statusCode !== undefined ? { statusCode } : {}),
   }

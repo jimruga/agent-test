@@ -229,3 +229,57 @@ Legend: **MUST-FIX (Gate 5)** blocks merge · **MUST-WIRE (Gate 6)** blocks depl
 - **Clean:** F12 (tenant groundwork), migrations 001-005 constraints/secrets/PII.
 - Objective verification (CI all-green + migration apply/rollback + independent review)
   remains pending human commit + CI — this review does not clear that gate.
+
+---
+
+## Re-verification — F1 + F2 (pre-Gate 5)
+Date: 2026-07-13
+SHA: a994e49b1e9f2a83ab6609b61c88e1f99e9a546c
+
+**F1 (nonce fail-closed):** CONFIRMED FIXED. `apps/api/src/auth/routes.ts` — (a) the
+issued nonce is carried on the single-use pre-auth record fetched at callback entry
+via `takePreAuth` (line 85); a missing pre-auth record rejects at line 86 *before*
+`exchangeCode` is called. (b) The ID-token nonce claim is now checked fail-closed at
+lines 106-111: `result.claims.nonce === undefined || !timingSafeStrEqual(result.claims.nonce, preAuth.nonce)`
+returns 400 — an absent/stripped nonce is rejected, not skipped (constant-time compare).
+(c) `takePreAuth` is single-use, consuming the whole pre-auth record (incl. nonce) on
+first use → replay protection intact.
+
+**F2 (PII-safe logs):** NOT FIXED (residual). `apps/api/src/platform/error-envelope.ts`
+`safeErrorLogFields` (lines 51-68) correctly uses an ALLOWLIST and never spreads `err`,
+so pg `detail`/`hint`/`where`/`parameters` (the exact original leak — conflicting row
+values) ARE dropped by construction — that half of the finding is genuinely fixed.
+BUT the allowlist still forwards `err.message` (line 63) and `err.stack` (line 64),
+which the re-verification acceptance criteria (b)/(c) require to be stripped. Residual
+risk: an Error whose `.message` embeds an OAuth token-endpoint response body or
+application-interpolated PII (email) is written verbatim to shipped logs (Logz.io/
+Sentry), and `stack` re-embeds the message. No pino `redact` compensates — `app.ts:13`
+configures the logger with only a level, no redact paths. To clear: drop `message`
+and `stack` from the returned record (keep `name`, `code`, `statusCode`, `type`), or
+add a redacting serializer; add a regression test asserting no `message`/`stack`/
+`detail`/`hint` field is serialized.
+
+Overall: FINDINGS REMAIN — F1 confirmed fixed; F2 partially fixed (pg row-value fields
+stripped) but `message` + `stack` still forwarded, failing the stated criteria. Route
+F2 back to software-engineer; re-review after fix.
+
+---
+
+## Re-verification 2 — F2 final (pre-Gate 5)
+Date: 2026-07-13
+
+**F2 (PII-safe logs):** CONFIRMED FIXED. `apps/api/src/platform/error-envelope.ts`
+`safeErrorLogFields` (lines 57-72) now returns ONLY structural fields —
+`name`, and conditionally `code`/`statusCode` when present (plus `{ name:'NonError',
+type }` for a non-Error throw). `message` and `stack` are no longer forwarded, so an
+Error whose `.message` embeds an OAuth token-endpoint response body or interpolated
+PII (email) is no longer written to shipped logs. The allowlist approach is preserved:
+the record is built by explicit field construction and never spreads `err`, so pg
+`detail`/`hint`/`where`/`parameters` and any future driver field are dropped by
+construction. Regression test (`error-envelope.test.ts:32-84`) asserts the safe fields
+`name`/`code`/`statusCode` are present AND that `message`/`stack`/`detail`/`hint`
+(and `where`/`table`/`column`/`schema`/`constraint`/`parameters`/`routine`) are absent,
+plus a belt-and-suspenders check that the email value appears nowhere in the record.
+
+Overall: CLEAN — F1 + F2 both confirmed fixed. (Objective CI signal — verify.sh
+all-green + independent review — remains pending human commit + CI per branch policy.)

@@ -1,0 +1,186 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Team To-Do App - compute layer (ADR-0002: EC2 + ALB for the sync API, warm Knex
+  pool, no RDS Proxy). ALB (HTTPS + HTTP->HTTPS redirect), target group with the
+  /ping health check, Launch Template (Node 26 baseline per ADR-0005), ASG
+  (Multi-AZ prod), and the LEAST-PRIVILEGE instance role (F4): GetSecretValue on
+  the enumerated ARNs only + Decrypt on the one CMK. No ambient credentials.
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [staging, production]
+  CertificateArn:
+    Type: String
+    Description: ACM cert ARN for the ALB HTTPS listener (443).
+  AmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64
+  InstanceType:
+    Type: String
+    Default: t4g.small
+  MinSize:
+    Type: Number
+    Default: 1
+  MaxSize:
+    Type: Number
+    Default: 4
+  ArtifactUrl:
+    Type: String
+    Description: HTTPS URL (S3/CodeArtifact) of the built API bundle to deploy.
+
+Conditions:
+  IsProd: !Equals [!Ref Environment, production]
+
+Resources:
+  # --- Least-privilege instance role (F4) ---
+  AppInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "ttd-${Environment}-app-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        # SSM Session Manager instead of SSH (no inbound 22, no key pairs)
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: read-only-app-secrets
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: GetOnlyEnumeratedSecrets     # F4: no wildcard
+                Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource:
+                  - { "Fn::ImportValue": !Sub "ttd-${Environment}-OAuthClientSecretArn" }
+                  - { "Fn::ImportValue": !Sub "ttd-${Environment}-SessionPepperArn" }
+                  - { "Fn::ImportValue": !Sub "ttd-${Environment}-DbRuntimeSecretArn" }
+                  - { "Fn::ImportValue": !Sub "ttd-${Environment}-RedisAuthSecretArn" }
+              - Sid: DecryptWithDataCmkOnly
+                Effect: Allow
+                Action: kms:Decrypt
+                Resource: { "Fn::ImportValue": !Sub "ttd-${Environment}-KmsKeyArn" }
+              - Sid: ShipLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !GetAtt AppLogGroup.Arn
+      # NOTE: app_migrator secret is deliberately NOT granted to the runtime role
+      # (F7 segregation). Only the migration runner (CI/deploy role) reads it.
+  AppInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties: { Roles: [!Ref AppInstanceRole] }
+
+  AppLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ttd/${Environment}/api"
+      RetentionInDays: !If [IsProd, 90, 14]
+
+  # --- ALB ---
+  Alb:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub "ttd-${Environment}-alb"
+      Type: application
+      Scheme: internet-facing
+      Subnets: !Split [",", { "Fn::ImportValue": !Sub "ttd-${Environment}-PublicSubnets" }]
+      SecurityGroups: [{ "Fn::ImportValue": !Sub "ttd-${Environment}-AlbSgId" }]
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "ttd-${Environment}-tg"
+      VpcId: { "Fn::ImportValue": !Sub "ttd-${Environment}-VpcId" }
+      Port: 3001
+      Protocol: HTTP
+      TargetType: instance
+      HealthCheckPath: /ping                 # operational liveness (app.ts)
+      HealthCheckIntervalSeconds: 15
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Matcher: { HttpCode: "200" }
+  HttpsListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref Alb
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      Certificates: [{ CertificateArn: !Ref CertificateArn }]
+      DefaultActions: [{ Type: forward, TargetGroupArn: !Ref TargetGroup }]
+  HttpRedirectListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref Alb
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: redirect
+          RedirectConfig: { Protocol: HTTPS, Port: "443", StatusCode: HTTP_301 }
+
+  # --- Launch template + ASG ---
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub "ttd-${Environment}-lt"
+      LaunchTemplateData:
+        ImageId: !Ref AmiId
+        InstanceType: !Ref InstanceType
+        IamInstanceProfile: { Arn: !GetAtt AppInstanceProfile.Arn }
+        SecurityGroupIds: [{ "Fn::ImportValue": !Sub "ttd-${Environment}-AppSgId" }]
+        MetadataOptions: { HttpTokens: required }   # IMDSv2 only
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            set -euo pipefail
+            # Node 26 baseline (ADR-0005). AMI is provisioned/baked with Node 26 +
+            # the CloudWatch agent; userdata pulls the artifact and starts the unit.
+            export ENVIRONMENT=${Environment}
+            /opt/ttd/bootstrap.sh "${ArtifactUrl}"
+            # App reads all secrets by ARN at runtime via the instance role (F4).
+            # Env carries only ARNs + non-secret config - NEVER secret values.
+            systemctl start ttd-api
+  Asg:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: 1
+        MaxBatchSize: 1
+        PauseTime: PT5M
+        WaitOnResourceSignals: false
+    Properties:
+      AutoScalingGroupName: !Sub "ttd-${Environment}-asg"
+      VPCZoneIdentifier: !Split [",", { "Fn::ImportValue": !Sub "ttd-${Environment}-AppSubnets" }]
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      MinSize: !If [IsProd, 2, !Ref MinSize]
+      MaxSize: !Ref MaxSize
+      DesiredCapacity: !If [IsProd, 2, 1]
+      TargetGroupARNs: [!Ref TargetGroup]
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 90
+  ScaleOnCpu:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref Asg
+      PolicyType: TargetTrackingScaling
+      TargetTrackingConfiguration:
+        PredefinedMetricSpecification: { PredefinedMetricType: ASGAverageCPUUtilization }
+        TargetValue: 55.0
+
+Outputs:
+  AlbDnsName:
+    Value: !GetAtt Alb.DNSName
+    Export: { Name: !Sub "ttd-${Environment}-AlbDns" }
+  AlbArn:
+    Value: !Ref Alb
+    Export: { Name: !Sub "ttd-${Environment}-AlbArn" }
+  AsgName:
+    Value: !Ref Asg
+    Export: { Name: !Sub "ttd-${Environment}-AsgName" }

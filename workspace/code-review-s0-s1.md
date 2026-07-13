@@ -22,3 +22,14 @@
 
 ## Solid (for audit)
 Clean DI seams; transport/logic/persistence separation; buildApp+app.inject per ADR-0003; tokens server-side only (asserted); PKCE S256; state/expiry tested; /me fails closed on erased user; migrations have real forward+down, explicit ON DELETE, indexed FKs, partial-unique active email, UUIDv7, PII-free sentinel; named-exports-only enforced; flag-off=404 proven.
+
+## Re-verification — C1 + W2 + W3 + W4 (pre-Gate 5)
+Date: 2026-07-13
+SHA: a994e49b1e9f2a83ab6609b61c88e1f99e9a546c
+
+**C1 (.gitignore):** CONFIRMED FIXED — blanket `secrets.*` replaced by credential-file patterns only (`secrets.json/yaml/yml`, `*.secrets.*`, `.secrets/`); comment documents the C1 rationale. `git check-ignore apps/api/src/platform/secrets.ts` now exits 1 (not ignored); the source file exists in the tree. Source module no longer dropped from CI checkout → tsc can resolve it.
+**W2 (Knex TS loader):** CONFIRMED FIXED — both `migrate:up` and `migrate:down` in apps/api/package.json carry `NODE_OPTIONS="--import tsx"` before the `knex ... --knexfile knexfile.ts` invocation; `tsx` is a devDependency. TS knexfile now loads at runtime.
+**W3 (nonce fail-closed):** CONFIRMED FIXED — routes.ts callback rejects with `bad_request` when `result.claims.nonce === undefined` OR it fails the constant-time compare against the issued nonce (fail closed, not a skipped check). Note: the nonce lives in the verified ID token, so this correctly sits immediately after `exchangeCode`; state (CSRF) is already checked before exchange. Security F1 addressed.
+**W4 (integration lane):** CONFIRMED FIXED — (a) user-repository.knex.itest.ts exercises the production KnexUserRepository against real Postgres: create-on-first-login, idempotent-by-(provider,subject), getWithMemberships join, and active-only/tombstoned exclusion; truncate-per-test isolation; skips when DATABASE_URL absent (keeps unit lane hermetic). (b) vitest.integration.config.ts includes `src/**/*.itest.ts` and serializes files. (c) ci.yml `integration` job applies migrations then runs `test:integration`, and `integration` is listed in `all-green.needs: [secret-scan, verify, migrations, integration, sca]`.
+
+Overall: CLEAN — all four fixes confirmed; no new findings. Suggestions S1–S4 remain deferred as previously scoped. Recommendation contingent on the all-green check being green (reported SHA a994e49b1e9f2a83ab6609b61c88e1f99e9a546c); the human approves at Gate 5.
