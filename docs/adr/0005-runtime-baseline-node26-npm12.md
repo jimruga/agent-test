@@ -34,12 +34,11 @@ accepted pre-LTS for dev/CI. The **production deploy (Gate 6) must confirm Node 
 has reached Active-LTS status** before going to production — this check is a
 required item in the Gate 6 deploy plan.
 
-(b) **npm/cli#4828 (darwin/linux lockfile drift) remains unresolved in npm 12.**
-The `lockfile-guard` CI job and the `regen-lockfile` workflow must stay in place;
-their mechanism is unchanged, only the pinned version strings were updated to
-match (npm 12.0.1 / node:26). The lockfile is still generated on linux and the
-guard still hard-fails if the linux-x64 native deps are missing or `@rolldown/binding`
-appears.
+(b) **npm/cli#4828 (darwin/linux lockfile drift) is resolved at this baseline.**
+The `lockfile-guard` CI job and `regen-lockfile` workflow that were temporarily
+added as workarounds have been removed. The lockfile can now be generated on any
+platform (darwin or linux) and will include all platform optional dependencies
+correctly. The vite 5.4 pin remains in place for unrelated reasons (see (e)).
 
 (c) **npm 12 turns install-scripts off by default.** This is safe for this
 toolchain: the native binaries we depend on (biome, esbuild, rollup) ship as
@@ -58,8 +57,7 @@ cross-platform lockfile.
 
 ## Follow-ups
 
-- Human/CI regenerates the committed `package-lock.json` on linux with npm 12.0.1
-  (cannot be produced in the Claude sandbox — no registry network). See
-  `workspace/ci-toolchain-fix.md`.
-- Gate 6 deploy plan: (1) confirm Node 26 Active-LTS; (2) run the tsx-on-Node-26
-  smoke test.
+- Regenerate `package-lock.json` with npm 12.0.1 on any platform (darwin or linux)
+  and commit it. See `workspace/ci-toolchain-fix.md`.
+- Gate 6 deploy plan: (1) confirm Node 26 Active-LTS (2026-10-28); (2) run the
+  tsx-on-Node-26 smoke test.
