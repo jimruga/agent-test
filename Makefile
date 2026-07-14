@@ -1,6 +1,7 @@
 .PHONY: help install dev build test lint typecheck check test-e2e gen-client clean \
 	claude-install claude-build claude-test claude-lint claude-lint-fix \
-	claude-typecheck claude-check claude-gen-client
+	claude-typecheck claude-check claude-gen-client \
+	dev-up dev-down dev-logs dev-migrate dev-shell
 
 # Standard targets shell out to `npm run` — use these in normal terminals and CI.
 #
@@ -73,3 +74,27 @@ claude-check: claude-typecheck claude-lint claude-test ## Verification gate (san
 
 claude-gen-client: ## Regenerate OpenAPI client (sandbox-safe)
 	cd apps/web && ../../$(ROOT_BIN)/openapi-ts -f openapi-ts.config.ts
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Local dev stack (Rancher Desktop) — Docker Compose
+# Uses Rancher's dockerd/moby socket via `docker compose`. containerd-mode users
+# swap the engine per-invocation, e.g.  make dev-up COMPOSE="nerdctl compose".
+# Copy .env.example to .env first (see §Secrets note in .env.example).
+# ──────────────────────────────────────────────────────────────────────────────
+COMPOSE ?= docker compose
+
+dev-up: ## Start local dev stack (Rancher/Docker)
+	$(COMPOSE) up --build -d
+	@echo "api → http://localhost:3001/ping   web → http://localhost:5173"
+
+dev-down: ## Stop and remove containers
+	$(COMPOSE) down --remove-orphans
+
+dev-logs: ## Tail all service logs
+	$(COMPOSE) logs -f
+
+dev-migrate: ## Run migrations against local Postgres
+	$(COMPOSE) exec -w /app/apps/api api sh -c 'NODE_OPTIONS="--import tsx" ../../node_modules/.bin/knex migrate:latest --knexfile knexfile.ts'
+
+dev-shell: ## Open a shell in the api container
+	$(COMPOSE) exec api sh

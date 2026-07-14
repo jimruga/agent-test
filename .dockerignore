@@ -1,0 +1,39 @@
+# Keep the build context small and deterministic. node_modules is excluded so
+# the `deps` stage installs fresh from the lockfile (and so the runtime bind
+# mount + anonymous volumes own node_modules, never a host copy).
+
+# Dependencies & build output
+node_modules
+**/node_modules
+dist
+build
+**/dist
+**/build
+coverage
+**/coverage
+*.tsbuildinfo
+
+# VCS & local env
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+
+# Team workspace / docs / governance — not needed to run the app
+workspace
+docs
+.claude
+compliance
+governance
+reliability
+evals
+examples
+infrastructure
+
+# Editor / OS noise
+.DS_Store
+.idea
+.vscode
+*.log
+*.swp

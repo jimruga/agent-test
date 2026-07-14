@@ -46,12 +46,20 @@ function looksLikeSecretValue(key: string, value: string): boolean {
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
-  for (const key of ['OAUTH_CLIENT_SECRET_ARN', 'SESSION_SECRET_ARN']) {
-    const v = env[key]
-    if (v && looksLikeSecretValue(key, v)) {
-      throw new Error(
-        `${key} must be an AWS ARN reference (arn:aws:...), not a literal secret value`,
-      )
+  // DEV-ONLY: under NODE_ENV=development the *_ARN vars hold non-AWS placeholders
+  // and the real secret is read as a plain value by the dev resolver (see
+  // platform/secrets.ts + index.ts). Skip the ARN-shape check here. Every other
+  // environment still enforces it so a literal secret can never masquerade as a
+  // reference (fails closed).
+  const isDevelopment = env.NODE_ENV === 'development'
+  if (!isDevelopment) {
+    for (const key of ['OAUTH_CLIENT_SECRET_ARN', 'SESSION_SECRET_ARN']) {
+      const v = env[key]
+      if (v && looksLikeSecretValue(key, v)) {
+        throw new Error(
+          `${key} must be an AWS ARN reference (arn:aws:...), not a literal secret value`,
+        )
+      }
     }
   }
 

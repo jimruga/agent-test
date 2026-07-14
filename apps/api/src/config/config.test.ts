@@ -27,6 +27,23 @@ describe('loadConfig', () => {
     const { OAUTH_CLIENT_ID: _omit, ...rest } = baseEnv
     expect(() => loadConfig(rest)).toThrow(/OAUTH_CLIENT_ID/)
   })
+
+  it('relaxes the ARN-shape check under NODE_ENV=development (plain vars carry the secret)', () => {
+    const cfg = loadConfig({
+      ...baseEnv,
+      NODE_ENV: 'development',
+      OAUTH_CLIENT_SECRET_ARN: 'local-dev-oauth',
+      SESSION_SECRET_ARN: 'local-dev-session',
+    })
+    expect(cfg.oauth.clientSecretArn).toBe('local-dev-oauth')
+    expect(cfg.sessionSecretArn).toBe('local-dev-session')
+  })
+
+  it('still enforces the ARN-shape check outside development (fails closed)', () => {
+    expect(() =>
+      loadConfig({ ...baseEnv, NODE_ENV: 'production', OAUTH_CLIENT_SECRET_ARN: 'not-an-arn' }),
+    ).toThrow(/must be an AWS ARN reference/)
+  })
 })
 
 describe('safeReturnTo (open-redirect guard)', () => {

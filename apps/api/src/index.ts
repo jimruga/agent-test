@@ -10,7 +10,7 @@ import { KnexUserRepository } from './auth/user-repository.knex'
 import { loadConfig } from './config/config'
 import type { AppDeps } from './deps'
 import { flagsFromEnv } from './platform/feature-flags'
-import { unwiredSecretResolver } from './platform/secrets'
+import { createDevResolver, unwiredSecretResolver } from './platform/secrets'
 
 // ── Composition root ────────────────────────────────────────────────────────
 // The ONLY place real implementations (Redis, Postgres, the OAuth provider) are
@@ -51,7 +51,13 @@ const verifyIdToken = async (_idToken: string): Promise<OAuthClaims> => {
 
 export function buildProdDeps(): AppDeps {
   const config = loadConfig()
-  const secretResolver = unwiredSecretResolver // devops wires AWS Secrets Manager
+  // NODE_ENV=development: read the OAuth client secret as a plain env var so
+  // `make dev-up` login works without AWS Secrets Manager. Every other env keeps
+  // the fail-closed resolver until devops wires real AWS Secrets Manager.
+  const secretResolver =
+    process.env.NODE_ENV === 'development'
+      ? createDevResolver('OAUTH_CLIENT_SECRET')
+      : unwiredSecretResolver
   const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379')
   const knex = knexFactory(
     knexConfig[process.env.NODE_ENV === 'production' ? 'production' : 'development'],

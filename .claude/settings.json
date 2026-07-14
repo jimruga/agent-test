@@ -1,5 +1,17 @@
 {
   "permissions": {
+    "allow": [
+      "Bash(git status*)",
+      "Bash(git add*)",
+      "Bash(git rm*)",
+      "Bash(git commit*)",
+      "Bash(git log*)",
+      "Bash(git diff*)",
+      "Bash(git branch*)",
+      "Bash(git checkout*)",
+      "Bash(git merge*)",
+      "Bash(git rebase*)"
+    ],
     "deny": [
       "Read(./.env)",
       "Read(./.env.*)",

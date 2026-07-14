@@ -1,0 +1,118 @@
+# Local dev stack for Rancher Desktop (Team To-Do).
+#
+# Works with BOTH Rancher backends:
+#   - dockerd/moby socket:  `docker compose up --build`
+#   - containerd mode:      `nerdctl compose up --build`
+# The Makefile `dev-*` targets wrap these; override with COMPOSE="nerdctl compose".
+#
+# No top-level `version:` key — it is obsolete in Compose v2 and warns on nerdctl.
+# Secrets are NOT in this file: values come from `.env` (gitignored; see .env.example).
+
+services:
+  postgres:
+    image: postgres:16-bookworm
+    environment:
+      POSTGRES_USER: postgres
+      # Interpolated from .env so it stays in sync with DATABASE_URL.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-localdev}
+      POSTGRES_DB: teamtodo
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d teamtodo"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [teamtodo]
+
+  redis:
+    # NOTE: the official redis image publishes no `-slim` variant; `-bookworm`
+    # IS the Debian (bookworm) base and is the correct slim-equivalent tag.
+    image: redis:7-bookworm
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-localdev}"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-localdev}
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping 2>/dev/null | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [teamtodo]
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    working_dir: /app/apps/api
+    # Run migrations to latest, THEN start the watcher. `exec` hands PID 1 to tsx
+    # so Ctrl-C / `dev-down` stops it cleanly. Migrations load TS via tsx.
+    command:
+      - sh
+      - -c
+      - |
+        echo "[api] applying migrations..."
+        NODE_OPTIONS="--import tsx" ../../node_modules/.bin/knex migrate:latest --knexfile knexfile.ts
+        echo "[api] starting server (tsx watch)..."
+        exec ../../node_modules/.bin/tsx watch src/index.ts
+    env_file:
+      - .env
+    ports:
+      - "3001:3001"
+    volumes:
+      # Bind the repo for hot-reload...
+      - .:/app
+      # ...but keep the image's installed node_modules (anonymous volumes shadow
+      # the host mount so the workspace symlinks/binaries survive).
+      - /app/node_modules
+      - /app/apps/api/node_modules
+      - /app/apps/web/node_modules
+      - /app/packages/shared/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # Node 26 has global fetch — no curl needed in the slim image.
+      test:
+        - CMD-SHELL
+        - node -e "fetch('http://localhost:3001/ping').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    networks: [teamtodo]
+
+  # Optional convenience service — the Vite dev server for apps/web. Reuses the
+  # same dev image (node:26-bookworm-slim base) so root node_modules/vite is
+  # present without a runtime `npm ci`; the repo bind-mount gives hot-reload.
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    working_dir: /app/apps/web
+    command: ["../../node_modules/.bin/vite", "--host", "--port", "5173"]
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/apps/api/node_modules
+      - /app/apps/web/node_modules
+      - /app/packages/shared/node_modules
+    depends_on:
+      api:
+        condition: service_started
+    networks: [teamtodo]
+
+volumes:
+  pgdata:
+  redisdata:
+
+networks:
+  teamtodo:
+    driver: bridge
