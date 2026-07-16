@@ -45,6 +45,19 @@ describe('GET /api/auth/login', () => {
     expect(res.statusCode).toBe(400)
     expect(res.json().error.code).toBe('bad_request')
   })
+
+  it('bounds pre-auth records per IP — the 11th login in the window is rejected 429 (F8, Redis-fill defense)', async () => {
+    const t = buildTestApp()
+    // The bound is enforced through the session store (real RedisSessionStore over
+    // InMemoryRedis), so this exercises the actual per-IP counter, not a stub.
+    for (let i = 0; i < 10; i++) {
+      const ok = await t.app.inject({ method: 'GET', url: '/api/auth/login' })
+      expect(ok.statusCode).toBe(302)
+    }
+    const blocked = await t.app.inject({ method: 'GET', url: '/api/auth/login' })
+    expect(blocked.statusCode).toBe(429)
+    expect(blocked.json().error.code).toBe('rate_limited')
+  })
 })
 
 describe('GET /api/auth/callback', () => {

@@ -87,6 +87,19 @@ describe('createGoogleProvider.exchangeCode', () => {
       /token exchange failed/,
     )
   })
+
+  it('rejects when verifyIdToken throws — an unverified token never yields claims (A08, F3)', async () => {
+    const { fetchImpl } = recordingFetch(
+      fakeResponse({ access_token: 'at', refresh_token: 'rt', id_token: 'idt', expires_in: 3600 }),
+    )
+    const failingVerify = vi.fn(async () => {
+      throw new Error('id token verification failed: signature')
+    })
+    const { provider } = makeProvider(fetchImpl, failingVerify)
+    await expect(provider.exchangeCode({ code: 'auth-code', codeVerifier: 'v' })).rejects.toThrow(
+      /verification failed/,
+    )
+  })
 })
 
 describe('createGoogleProvider.revoke', () => {

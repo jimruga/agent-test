@@ -15,6 +15,19 @@ import {
 
 const PRE_AUTH_TTL_SECONDS = 600 // 10 minutes to complete the login round-trip.
 
+// F8 (Redis-fill defense): cap in-flight pre-auth records per client IP. An
+// attacker who hammers /auth/login would otherwise create an unbounded number of
+// pre-auth records in Redis. This is a coarse per-IP bound in addition to the
+// edge rate limit (@fastify/rate-limit) — belt and braces at the app layer.
+const MAX_PRE_AUTH_PER_IP = 10
+const PRE_AUTH_COUNT_WINDOW_SECONDS = 600 // 10-minute fixed window.
+
+// Per-route rate-limit metadata read by @fastify/rate-limit (F8). Registered
+// with `global: false` at the composition root, so this config is what activates
+// the limiter on the auth routes; it is inert (ignored) when the plugin is absent
+// (e.g. the in-memory test app), keeping the unit suite free of the edge plugin.
+const AUTH_RATE_LIMIT = { max: 100, timeWindow: '5 minutes' } as const
+
 /**
  * OAuth2 authorization-code + PKCE routes. All token handling is server-side
  * (TDD §5): the browser only ever receives an opaque session cookie. These
@@ -35,10 +48,21 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps): void {
   // GET /api/auth/login — start the flow.
   app.get<{ Querystring: { provider?: string; returnTo?: string } }>(
     '/auth/login',
+    { config: { rateLimit: AUTH_RATE_LIMIT } },
     async (req, reply) => {
       const provider = req.query.provider ?? config.oauth.provider
       if (provider !== config.oauth.provider) {
         return sendError(reply, 'bad_request', 'Unsupported identity provider')
+      }
+      // Bound per-IP pre-auth record creation BEFORE writing anything to Redis
+      // (F8, fail-closed on breach).
+      const withinBound = await sessionStore.registerPreAuthAttempt(
+        req.ip,
+        MAX_PRE_AUTH_PER_IP,
+        PRE_AUTH_COUNT_WINDOW_SECONDS,
+      )
+      if (!withinBound) {
+        return sendError(reply, 'rate_limited', 'Too many sign-in attempts, try again later')
       }
       const state = generateState()
       const nonce = generateNonce()
@@ -72,6 +96,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps): void {
   // GET /api/auth/callback — provider redirect target; exchange code server-side.
   app.get<{ Querystring: { code?: string; state?: string } }>(
     '/auth/callback',
+    { config: { rateLimit: AUTH_RATE_LIMIT } },
     async (req, reply) => {
       const { code, state } = req.query
       if (!code || !state) {
@@ -103,6 +128,9 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps): void {
       // so per OIDC the ID token must echo it — an absent/undefined nonce is a
       // rejection (fail closed), never a skipped check (sec F1 / review W3, OWASP
       // A07). Ideally the JWKS verifier also binds the nonce; see impl-notes.
+      // S1 / F3-NONCE-TRACK (workspace/security-review-f3-f8-f9.md): moving the
+      // nonce binding INSIDE the verifier is a planned S2 hardening task; the
+      // route-level check here is the current control.
       if (
         result.claims.nonce === undefined ||
         !timingSafeStrEqual(result.claims.nonce, preAuth.nonce)
@@ -148,7 +176,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps): void {
   )
 
   // POST /api/auth/logout — revoke session + provider token; idempotent.
-  app.post('/auth/logout', async (req, reply) => {
+  app.post('/auth/logout', { config: { rateLimit: AUTH_RATE_LIMIT } }, async (req, reply) => {
     const sessionId = parseCookies(req.headers.cookie)[config.cookie.name]
     if (sessionId) {
       const session = await sessionStore.getSession(sessionId)

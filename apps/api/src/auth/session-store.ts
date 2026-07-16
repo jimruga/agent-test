@@ -31,6 +31,14 @@ export interface SessionStore {
   putPreAuth(id: string, data: PreAuthData, ttlSeconds: number): Promise<void>
   /** Single-use fetch: returns and deletes the pre-auth transaction (replay-safe). */
   takePreAuth(id: string): Promise<PreAuthData | null>
+  /**
+   * Bound in-flight pre-auth record creation per client IP within a sliding window
+   * (F8, Redis-fill defense). Increments the per-IP counter and returns whether
+   * the attempt is within `maxPerWindow`. Every attempt re-arms the window TTL, so
+   * the counter always carries a TTL and self-expires after `windowSeconds` of
+   * inactivity (W1: no orphaned TTL-less key on a mid-call crash).
+   */
+  registerPreAuthAttempt(ip: string, maxPerWindow: number, windowSeconds: number): Promise<boolean>
   createSession(record: SessionRecord, idleTtlSeconds: number): Promise<void>
   getSession(id: string): Promise<SessionRecord | null>
   /** Sliding idle timeout — extend the session's TTL on activity. */
@@ -43,9 +51,12 @@ export interface RedisLike {
   set(key: string, value: string, ttlSeconds: number): Promise<void>
   del(key: string): Promise<void>
   expire(key: string, ttlSeconds: number): Promise<void>
+  /** Atomic increment (creates the key at 1 with NO expiry until `expire` is set). */
+  incr(key: string): Promise<number>
 }
 
 const PRE_AUTH_PREFIX = 'preauth:'
+const PRE_AUTH_COUNT_PREFIX = 'preauth-count:'
 const SESSION_PREFIX = 'session:'
 
 export class RedisSessionStore implements SessionStore {
@@ -64,6 +75,29 @@ export class RedisSessionStore implements SessionStore {
     if (!raw) return null
     await this.redis.del(key)
     return JSON.parse(raw) as PreAuthData
+  }
+
+  async registerPreAuthAttempt(
+    ip: string,
+    maxPerWindow: number,
+    windowSeconds: number,
+  ): Promise<boolean> {
+    const key = PRE_AUTH_COUNT_PREFIX + ip
+    const count = await this.redis.incr(key)
+    // W1 (atomicity): INCR creates a TTL-less key. Arming EXPIRE only on the first
+    // increment leaves an orphaned, never-expiring key if the process dies between
+    // the two calls (OOM/restart/deploy) — every later attempt from that IP then
+    // increments a permanent counter and permanently locks the IP out of login.
+    // Calling EXPIRE UNCONDITIONALLY after every INCR guarantees the key always
+    // carries a TTL once this method returns, for any crash interleaving. This makes
+    // the counter a sliding window (each attempt refreshes the window; it self-clears
+    // only after `windowSeconds` of inactivity).
+    // F8-FIXEDWINDOW-TRACK: like any windowed counter this admits up to ~2×
+    // maxPerWindow across a window edge (a burst as one window ends plus a burst as
+    // the next begins). Known, accepted trade-off — the edge @fastify/rate-limit is
+    // the primary control and this per-IP bound is belt-and-braces (see routes.ts).
+    await this.redis.expire(key, windowSeconds)
+    return count <= maxPerWindow
   }
 
   async createSession(record: SessionRecord, idleTtlSeconds: number): Promise<void> {
@@ -122,5 +156,16 @@ export class InMemoryRedis implements RedisLike {
   async expire(key: string, ttlSeconds: number): Promise<void> {
     const entry = this.live(key)
     if (entry) entry.expiresAt = this.now() + ttlSeconds * 1000
+  }
+  async incr(key: string): Promise<number> {
+    const entry = this.live(key)
+    if (entry) {
+      const next = Number(entry.value) + 1
+      entry.value = String(next)
+      return next
+    }
+    // New key: created at 1 with no expiry until `expire` arms it (matches Redis).
+    this.store.set(key, { value: '1', expiresAt: Number.POSITIVE_INFINITY })
+    return 1
   }
 }

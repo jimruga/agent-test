@@ -1,3 +1,4 @@
+import type { FastifyInstance } from 'fastify'
 import type { OAuthProvider } from './auth/oauth-provider'
 import type { Clock, SessionStore } from './auth/session-store'
 import type { UserRepository } from './auth/user-repository'
@@ -15,4 +16,10 @@ export interface AppDeps {
   readonly sessionStore: SessionStore
   readonly userRepository: UserRepository
   readonly now?: Clock
+  /**
+   * Register edge security plugins (helmet + rate-limit) on the root app. Injected
+   * so the real third-party plugins are wired only at the composition root; the
+   * in-memory unit app leaves it undefined (F8/F9 have their own opt-in tests).
+   */
+  readonly registerSecurityPlugins?: (app: FastifyInstance) => void
 }

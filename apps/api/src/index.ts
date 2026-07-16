@@ -1,27 +1,35 @@
 import Redis from 'ioredis'
+import { createRemoteJWKSet, jwtVerify } from 'jose'
 import knexFactory from 'knex'
 import { uuidv7 } from 'uuidv7'
 import knexConfig from '../knexfile'
 import { buildApp } from './app'
+import { buildJwksVerifier } from './auth/jwks-verifier'
 import { createGoogleProvider } from './auth/oauth-provider'
-import type { OAuthClaims } from './auth/oauth-provider'
 import { type RedisLike, RedisSessionStore } from './auth/session-store'
 import { KnexUserRepository } from './auth/user-repository.knex'
 import { loadConfig } from './config/config'
 import type { AppDeps } from './deps'
 import { flagsFromEnv } from './platform/feature-flags'
 import { createDevResolver, unwiredSecretResolver } from './platform/secrets'
+import { registerSecurityPlugins } from './platform/security'
+
+// Google OIDC discovery constants (public). The JWKS is fetched + cached by jose's
+// createRemoteJWKSet; jwtVerify checks the signature against it plus iss/aud/exp.
+const GOOGLE_ISSUER = 'https://accounts.google.com'
+const GOOGLE_JWKS_URL = 'https://www.googleapis.com/oauth2/v3/certs'
 
 // ── Composition root ────────────────────────────────────────────────────────
-// The ONLY place real implementations (Redis, Postgres, the OAuth provider) are
-// constructed. Everything below the app boundary depends on interfaces, so this
-// file carries the wiring and the app carries the logic. Excluded from unit
-// coverage; validated by typecheck + the integration/deploy lanes.
+// The ONLY place real implementations (Redis, Postgres, the OAuth provider, the
+// JWKS verifier, the edge security plugins) are constructed. Everything below the
+// app boundary depends on interfaces, so this file carries the wiring and the app
+// carries the logic. Excluded from unit coverage; validated by typecheck + the
+// integration/deploy lanes.
 //
-// TWO wiring points remain before a working deploy (tracked in impl-notes,
-// flagged to security + devops):
-//   1. `verifyIdToken` — JWKS signature + iss/aud/exp validation (security).
-//   2. `secretResolver` — AWS Secrets Manager (devops IAM). Fails closed today.
+// ONE wiring point remains before a working deploy (tracked in impl-notes, flagged
+// to devops):
+//   - `secretResolver` — AWS Secrets Manager (devops IAM). Fails closed today.
+// (F3 wired the real JWKS `verifyIdToken`; F8/F9 wired the edge security plugins.)
 
 function ioredisAdapter(redis: Redis): RedisLike {
   return {
@@ -37,20 +45,28 @@ function ioredisAdapter(redis: Redis): RedisLike {
     async expire(key, ttlSeconds) {
       await redis.expire(key, ttlSeconds)
     },
+    async incr(key) {
+      return redis.incr(key)
+    },
   }
-}
-
-// PLACEHOLDER — MUST be replaced with real JWKS-based verification (e.g. `jose`
-// createRemoteJWKSet + jwtVerify against the provider's issuer) before production.
-// Fails closed so an unverified token can never establish a session (OWASP A08).
-const verifyIdToken = async (_idToken: string): Promise<OAuthClaims> => {
-  throw new Error(
-    'verifyIdToken not wired: implement JWKS signature + iss/aud/exp verification before deploy',
-  )
 }
 
 export function buildProdDeps(): AppDeps {
   const config = loadConfig()
+  // Real ID-token verification (F3, OWASP A07/A08). The JWKS key set + jose's
+  // jwtVerify are injected into the pure verifier; audience is this deployment's
+  // OAuth client id. jose validates signature/iss/aud/exp; buildJwksVerifier adds
+  // required-claim extraction and fails closed.
+  const googleJwks = createRemoteJWKSet(new URL(GOOGLE_JWKS_URL))
+  const verifyIdToken = buildJwksVerifier({
+    jwtVerify: async (token, keySet, options) => {
+      const { payload } = await jwtVerify(token, keySet as Parameters<typeof jwtVerify>[1], options)
+      return { payload }
+    },
+    keySet: googleJwks,
+    issuer: GOOGLE_ISSUER,
+    audience: config.oauth.clientId,
+  })
   // NODE_ENV=development: read the OAuth client secret as a plain env var so
   // `make dev-up` login works without AWS Secrets Manager. Every other env keeps
   // the fail-closed resolver until devops wires real AWS Secrets Manager.
@@ -76,6 +92,7 @@ export function buildProdDeps(): AppDeps {
     }),
     sessionStore: new RedisSessionStore(ioredisAdapter(redis)),
     userRepository: new KnexUserRepository(knex, uuidv7),
+    registerSecurityPlugins,
   }
 }
 

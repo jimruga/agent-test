@@ -73,7 +73,15 @@ export interface TestApp {
   advance(ms: number): void
 }
 
-export function buildTestApp(options: { flagsOn?: string[] } = {}): TestApp {
+export function buildTestApp(
+  options: {
+    flagsOn?: string[]
+    // Opt in to the real edge security plugins (helmet + rate-limit). Left
+    // undefined by default so the bulk of the suite stays free of the edge
+    // plugins; the F8/F9 tests pass the real registrar from platform/security.
+    registerSecurityPlugins?: (app: FastifyInstance) => void
+  } = {},
+): TestApp {
   let clock = 1_700_000_000_000
   const now = () => clock
   const oauth = new FakeOAuthProvider()
@@ -87,6 +95,7 @@ export function buildTestApp(options: { flagsOn?: string[] } = {}): TestApp {
     sessionStore,
     userRepository,
     now,
+    registerSecurityPlugins: options.registerSecurityPlugins,
   }
   return {
     app: buildApp(deps),
